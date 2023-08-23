@@ -1,0 +1,28 @@
+----------------------------------
+
+NXP Software Content Register
+
+Package: se05x-openssl-provider
+Version: 01.00.00
+
+-----------------------------------
+
+se05x-openssl-provider
+- Name: se05x openssl provider
+- Version: 01.00.00
+- Outgoing License:Apache 2.0
+- License File: /LICENSE.txt
+- Type of content: Source Code
+- Description: se05x openssl provider
+- Origin: Copyright 2022-2023 NXP
+- Release Location: https://github.com/NXPplugntrust/se05x-openssl-provider
+
+simw_lib
+- Name: Plug&Trust Mini Package
+- Version: 04.04.00
+- Outgoing License:Apache 2.0
+- License File: /simw_lib/LICENSE.txt
+- Type of content: Source Code
+- Description: Plug&Trust Mini Package
+- Origin: Copyright 2018-2023 NXP
+- Release Location: https://github.com/NXP/plug-and-trust.git 
