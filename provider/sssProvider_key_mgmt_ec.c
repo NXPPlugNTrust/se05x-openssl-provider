@@ -374,8 +374,13 @@ static int sss_ec_keymgmt_export(void *keydata, int selection, OSSL_CALLBACK *pa
             privkey[2]                      = 0x00;                            /* Reserved*/
             memcpy(&privkey[2], magic_num, sizeof(magic_num));                 /* Magic Number */
             memcpy(&privkey[10], &pStoreCtx->keyid, sizeof(pStoreCtx->keyid)); /* key id Information */
-            //params[i++] = OSSL_PARAM_construct_utf8_string(OSSL_PKEY_PARAM_PRIV_KEY, &privkey[0], sizeof(privkey));
-            params[i++] = OSSL_PARAM_construct_BN(OSSL_PKEY_PARAM_PRIV_KEY, &privkey[0], sizeof(privkey));
+
+            if (pStoreCtx->pProvCtx->pKeyGen == NULL)
+            {
+                params[i++] = OSSL_PARAM_construct_utf8_string(OSSL_PKEY_PARAM_PRIV_KEY, &privkey[0], pStoreCtx->key_len);
+            }
+            params[i++] = OSSL_PARAM_construct_BN(OSSL_PKEY_PARAM_PRIV_KEY, &privkey[0], pStoreCtx->key_len);
+
         }
 
         params[i++] = OSSL_PARAM_construct_end();
