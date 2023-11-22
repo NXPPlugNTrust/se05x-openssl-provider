@@ -26,3 +26,12 @@ simw_lib
 - Description: Plug&Trust Mini Package
 - Origin: Copyright 2018-2023 NXP
 - Release Location: https://github.com/NXP/plug-and-trust.git 
+
+openssl-30
+- Name: openssl-3.0
+- Version: OpenSSL 3.0.7 1 Nov 2022
+- License: Apache 2.0
+- Type of content: Source Code
+- Description: Openssl 3.0 stack
+- Origin: https://github.com/openssl/openssl/tree/openssl-3.0
+- Location: provider/sssProvider_main.c

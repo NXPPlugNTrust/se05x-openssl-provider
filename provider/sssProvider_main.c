@@ -1,13 +1,15 @@
+
+/*
+ * Copyright 2019-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2022-2023 NXP
+ *
+ * Licensed under the Apache License 2.0 (the "License").  You may not use
+ * this file except in compliance with the License.  You can obtain a copy
+ * in the file LICENSE in the source distribution or at
+ * https://www.openssl.org/source/license.html
+ */
+
 /**
- * @file sssProvider_main.c
- * @author NXP Semiconductors
- * @version 1.0
- * @par License
- *
- * Copyright 2022 NXP
- * SPDX-License-Identifier: Apache-2.0
- *
- * @par Description
  * OpenSSL Provider for NXP Embedded Secure Element over SSS API's
  *
  * The following operations are supported by this provider:
