@@ -24,6 +24,7 @@
 #include <string.h>
 #include <openssl/core_names.h>
 #include "sssProvider_main.h"
+#include "openssl/rsa.h"
 
 /* ********************** Constants ************************** */
 #define MAX_DIGEST_INPUT_DATA 512
@@ -33,6 +34,7 @@ typedef struct
 {
     sss_algorithm_t sha_algorithm;
     sss_algorithm_t sign_algorithm;
+    int pad_mode;
     uint8_t digest[64]; /* MAX SHA512 */
     size_t digestLen;
     sss_provider_store_obj_t *pStoreObjCtx;
@@ -106,6 +108,7 @@ static int sss_rsa_signature_init(void *ctx, void *provkey, const OSSL_PARAM par
 
     ENSURE_OR_GO_CLEANUP(pRsaCtx != NULL);
     pRsaCtx->pStoreObjCtx = provkey;
+    pRsaCtx->sign_algorithm = kAlgorithm_None;
 
     ret = 1;
 cleanup:
@@ -133,6 +136,10 @@ static int sss_rsa_signature_sign(
     ENSURE_OR_GO_CLEANUP(siglen != NULL);
     ENSURE_OR_GO_CLEANUP(tbs != NULL);
 
+    if (pRsaCtx->sign_algorithm == kAlgorithm_None) {
+        pRsaCtx->sign_algorithm = kAlgorithm_SSS_RSASSA_PKCS1_V1_5_NO_HASH;
+    }
+
     if (pRsaCtx->pStoreObjCtx->object.keyId != 0) {
         if (sig == NULL) {
             *siglen = pRsaCtx->pStoreObjCtx->key_len;
@@ -146,7 +153,7 @@ static int sss_rsa_signature_sign(
             status = sss_asymmetric_context_init(&asymmCtx,
                 &pRsaCtx->pProvCtx->p_ex_sss_boot_ctx->session,
                 &pRsaCtx->pStoreObjCtx->object,
-                kAlgorithm_SSS_RSASSA_PKCS1_V1_5_NO_HASH,
+                pRsaCtx->sign_algorithm,
                 kMode_SSS_Sign);
             ENSURE_OR_GO_CLEANUP(status == kStatus_SSS_Success);
 
@@ -198,6 +205,7 @@ cleanup:
     }
     return ret;
 }
+
 
 static int sss_rsa_signature_digest_init(void *ctx, const char *mdname, void *provkey, const OSSL_PARAM params[])
 {
@@ -635,6 +643,10 @@ static int sss_rsa_signature_verify(
     ENSURE_OR_GO_CLEANUP(pRsaCtx != NULL);
     ENSURE_OR_GO_CLEANUP(pRsaCtx->pStoreObjCtx != NULL);
 
+    if (pRsaCtx->sign_algorithm == kAlgorithm_None) {
+        pRsaCtx->sign_algorithm = kAlgorithm_SSS_RSASSA_PKCS1_V1_5_NO_HASH;
+    }
+
     if (pRsaCtx->pStoreObjCtx->object.keyId != 0) {
         ENSURE_OR_GO_CLEANUP(pRsaCtx->pProvCtx != NULL);
         ENSURE_OR_GO_CLEANUP(pRsaCtx->pProvCtx->p_ex_sss_boot_ctx != NULL);
@@ -643,7 +655,7 @@ static int sss_rsa_signature_verify(
         status = sss_asymmetric_context_init(&asymmCtx,
             &(pRsaCtx->pProvCtx->p_ex_sss_boot_ctx->session),
             &pRsaCtx->pStoreObjCtx->object,
-            kAlgorithm_SSS_RSASSA_PKCS1_V1_5_NO_HASH,
+            pRsaCtx->sign_algorithm,
             kMode_SSS_Verify);
         ENSURE_OR_GO_CLEANUP(status == kStatus_SSS_Success);
 
@@ -804,6 +816,155 @@ static int sss_rsa_signature_digest_verify(
     return 0;
 }
 
+
+static int sss_rsa_set_ctx_params(void *ctx, const OSSL_PARAM params[])
+{
+    const OSSL_PARAM *p = NULL;
+    sss_provider_rsa_ctx_st *pRsaCtx = ctx;
+
+    sssProv_Print(LOG_DBG_ON, "Enter - %s \n", __FUNCTION__);
+
+    if (pRsaCtx == NULL) {
+        return 0;
+    }
+
+    p = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_PAD_MODE);
+    if (p != NULL)
+    {
+        switch (p->data_type) {
+        case OSSL_PARAM_INTEGER:
+            if (!OSSL_PARAM_get_int(p, &pRsaCtx->pad_mode)) {
+                return 0;
+            }
+            break;
+        case OSSL_PARAM_UTF8_STRING:
+        {
+            if (p->data == NULL) {
+                return 0;
+            }
+            if (strcmp(p->data, OSSL_PKEY_RSA_PAD_MODE_PKCSV15) == 0) {
+                pRsaCtx->pad_mode = RSA_PKCS1_PADDING;
+            }
+            else if (strcmp(p->data, OSSL_PKEY_RSA_PAD_MODE_NONE) == 0) {
+                pRsaCtx->pad_mode = RSA_NO_PADDING;
+                pRsaCtx->sign_algorithm = kAlgorithm_SSS_RSASSA_PKCS1_V1_5_NO_HASH;
+            }
+            else if (strcmp(p->data, OSSL_PKEY_RSA_PAD_MODE_PSS) == 0) {
+                pRsaCtx->pad_mode = RSA_PKCS1_PSS_PADDING;
+            }
+            else {
+                sssProv_Print(LOG_ERR_ON, "Padding not supported ! \n");
+                return 0;
+            }
+        } break;
+        default:
+            return 0;
+        }
+    }
+
+    if (pRsaCtx->pad_mode == RSA_PKCS1_PADDING) {
+        switch (pRsaCtx->sha_algorithm) {
+        case kAlgorithm_SSS_SHA1:
+            pRsaCtx->sign_algorithm = kAlgorithm_SSS_RSASSA_PKCS1_V1_5_SHA1;
+            break;
+        case kAlgorithm_SSS_SHA224:
+            pRsaCtx->sign_algorithm = kAlgorithm_SSS_RSASSA_PKCS1_V1_5_SHA224;
+            break;
+        case kAlgorithm_SSS_SHA256:
+            pRsaCtx->sign_algorithm = kAlgorithm_SSS_RSASSA_PKCS1_V1_5_SHA256;
+            break;
+        case kAlgorithm_SSS_SHA384:
+            pRsaCtx->sign_algorithm = kAlgorithm_SSS_RSASSA_PKCS1_V1_5_SHA384;
+            break;
+        case kAlgorithm_SSS_SHA512:
+            pRsaCtx->sign_algorithm = kAlgorithm_SSS_RSASSA_PKCS1_V1_5_SHA512;
+            break;
+        default:
+            pRsaCtx->sign_algorithm = kAlgorithm_SSS_RSASSA_PKCS1_V1_5_SHA256;
+            break;
+        }
+    }
+    else if (pRsaCtx->pad_mode == RSA_PKCS1_PSS_PADDING) {
+        switch (pRsaCtx->sha_algorithm) {
+        case kAlgorithm_SSS_SHA1:
+            pRsaCtx->sign_algorithm = kAlgorithm_SSS_RSASSA_PKCS1_PSS_MGF1_SHA1;
+            break;
+        case kAlgorithm_SSS_SHA224:
+            pRsaCtx->sign_algorithm = kAlgorithm_SSS_RSASSA_PKCS1_PSS_MGF1_SHA224;
+            break;
+        case kAlgorithm_SSS_SHA256:
+            pRsaCtx->sign_algorithm = kAlgorithm_SSS_RSASSA_PKCS1_PSS_MGF1_SHA256;
+            break;
+        case kAlgorithm_SSS_SHA384:
+            pRsaCtx->sign_algorithm = kAlgorithm_SSS_RSASSA_PKCS1_PSS_MGF1_SHA384;
+            break;
+        case kAlgorithm_SSS_SHA512:
+            pRsaCtx->sign_algorithm = kAlgorithm_SSS_RSASSA_PKCS1_PSS_MGF1_SHA512;
+            break;
+        default:
+            pRsaCtx->sign_algorithm = kAlgorithm_SSS_RSASSA_PKCS1_PSS_MGF1_SHA256;
+            break;
+        }
+    }
+
+    return 1;
+}
+
+
+static const OSSL_PARAM *sss_rsa_settable_ctx_params(void *vprsactx, ossl_unused void *provctx)
+{
+    static const OSSL_PARAM settable_ctx_params[] = {OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_DIGEST, NULL, 0),
+    OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_PROPERTIES, NULL, 0),
+    OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_PAD_MODE, NULL, 0),
+    OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_PSS_SALTLEN, NULL, 0),
+    OSSL_PARAM_END};
+
+    sssProv_Print(LOG_DBG_ON, "Enter - %s \n", __FUNCTION__);
+    return settable_ctx_params;
+}
+
+static int sss_rsa_get_ctx_params(void *ctx, OSSL_PARAM *params)
+{
+    int ret                              = 0;
+    sss_provider_rsa_ctx_st *pEcdsaCtx = ctx;
+    OSSL_PARAM *p;
+    uint8_t aid[] = AID_RSA_WITH_SHA256;
+
+    sssProv_Print(LOG_DBG_ON, "Enter - %s \n", __FUNCTION__);
+
+    ENSURE_OR_GO_CLEANUP(pEcdsaCtx != NULL);
+
+    /* TBD - To be updated for all SHA algorithms */
+
+    p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_ALGORITHM_ID);
+    if (p != NULL && !OSSL_PARAM_set_octet_string(p, aid, sizeof(aid))) {
+        return 0;
+    }
+
+    p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_DIGEST);
+    if (p != NULL && !OSSL_PARAM_set_utf8_string(p, "SHA256")) {
+        return 0;
+    }
+
+    ret = 1;
+cleanup:
+    return ret;
+
+}
+
+static const OSSL_PARAM known_gettable_ctx_params[] = {
+    OSSL_PARAM_octet_string(OSSL_SIGNATURE_PARAM_ALGORITHM_ID, NULL, 0),
+    OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_DIGEST, NULL, 0),
+    OSSL_PARAM_END
+};
+
+static const OSSL_PARAM *sss_rsa_gettable_ctx_params(ossl_unused void *vprsactx,
+                                                 ossl_unused void *provctx)
+{
+    sssProv_Print(LOG_DBG_ON, "Enter - %s \n", __FUNCTION__);
+    return known_gettable_ctx_params;
+}
+
 const OSSL_DISPATCH sss_rsa_signature_functions[] = {
     {OSSL_FUNC_SIGNATURE_NEWCTX, (void (*)(void))sss_rsa_signature_newctx},
     {OSSL_FUNC_SIGNATURE_FREECTX, (void (*)(void))sss_rsa_signature_freectx},
@@ -820,6 +981,11 @@ const OSSL_DISPATCH sss_rsa_signature_functions[] = {
     {OSSL_FUNC_SIGNATURE_DIGEST_VERIFY_UPDATE, (void (*)(void))sss_rsa_signature_digest_update},
     {OSSL_FUNC_SIGNATURE_DIGEST_VERIFY_FINAL, (void (*)(void))sss_rsa_signature_digest_verify_final},
     {OSSL_FUNC_SIGNATURE_DIGEST_VERIFY, (void (*)(void))sss_rsa_signature_digest_verify},
+    {OSSL_FUNC_SIGNATURE_SET_CTX_PARAMS, (void (*)(void))sss_rsa_set_ctx_params},
+    {OSSL_FUNC_SIGNATURE_SETTABLE_CTX_PARAMS, (void (*)(void))sss_rsa_settable_ctx_params},
+    { OSSL_FUNC_SIGNATURE_GET_CTX_PARAMS, (void (*)(void))sss_rsa_get_ctx_params },
+    { OSSL_FUNC_SIGNATURE_GETTABLE_CTX_PARAMS,(void (*)(void))sss_rsa_gettable_ctx_params},
+
     {0, NULL}};
 
 #endif //#if SSS_HAVE_RSA

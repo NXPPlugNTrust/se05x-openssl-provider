@@ -56,6 +56,9 @@ Above commands will build the OpenSSL provider and copy in ``se05x-openssl-provi
 Refer ``CMAKE Options section`` in ``simw_lib\README.rst`` to build OpenSSL provider with different session authentication.
 
 
+`` Note: It is recommended to use access manager to establish PlatformSCP03 session to secure element.``
+
+
 ## Testing OpenSSL Provider
 
 ### Random Number Generation
@@ -159,6 +162,32 @@ openssl pkeyutl --provider /usr/local/lib/libsssProvider.so --provider default -
 
 ```console
 openssl pkeyutl -verify --provider /usr/local/lib/libsssProvider.so --provider default -inkey se05x_rsa2048_ref.pem -verify -rawin -in input.txt -sigfile signature.txt -digest sha256
+
+```
+
+### RSA - Encrypt Operation
+
+Supported RSA Padding Modes - oaep, pkcs1
+
+```console
+openssl pkeyutl --provider /usr/local/lib/libsssProvider.so --provider default -encrypt -inkey se05x_rsa2048_ref.pem -in input.txt -out encrypt.txt -pkeyopt rsa_padding_mode:oaep
+
+```
+
+### RSA - Decrypt Operation
+
+Supported RSA Padding Modes - oaep, pkcs1
+
+```console
+openssl pkeyutl --provider /usr/local/lib/libsssProvider.so --provider default -decrypt -inkey se05x_rsa2048_ref.pem -in encrypt.txt -out decrypt.txt -pkeyopt rsa_padding_mode:oaep
+
+```
+
+### RSA Certificate Sign Request (CSR) / Certificate Generation
+
+```console
+openssl req -new --provider /usr/local/lib/libsssProvider.so --provider default -key se05x_rsa2048_ref.pem -subj "/C=AA/ST=BBB/L=CCC/O=NXP/OU=NXP/CN=example.com" -out out.csr
+openssl x509 -req --provider /usr/local/lib/libsssProvider.so --provider default -in out.csr -CAcreateserial -out out.cer -days 5000 -CA rootca.cer -CAkey rootca_key.pem
 
 ```
 
@@ -286,4 +315,109 @@ python openssl_RsaGenKey.py
 # RSA Sign and Verify
 python openssl_RSA.py
 
+# RSA Encrypt and Decrypt
+python openssl_RsaEnc.py
+
+# RSA CSR and certificate creation
+python openssl_RsaCSR.py
+
+```
+
+
+## TLS Client example using provider
+
+This section explains how to set-up a TLS link using the SE05x OpenSSL Provider on the client side.
+The TLS demo demonstrates setting up a mutually authenticated and encrypted link between a client and a server system.
+
+The keypair used to identify the client is created / stored in the Secure Element.
+
+The keypair used to identify the server is simply available as a pem file.
+
+The public keys associated with the respective key pairs are contained in respectively a client and a server certificate.
+
+The CA is a self-signed certificate. The same CA is used to sign client and server certificate.
+
+### TLS client example using EC keys
+
+Create client and server credentials as shown below
+
+```console
+openssl ecparam -name prime256v1 -out prime256v1.pem
+
+
+# Create Root CA key pair and certificate
+openssl ecparam -in prime256v1.pem -genkey -noout -out tls_rootca_key.pem
+openssl req -x509 -new -nodes -key tls_rootca_key.pem -subj /OU="NXP Plug Trust CA/CN=NXP RootCAvRxxx" -days 4380 -out tls_rootca.cer
+
+
+# Create client key inside secure element
+openssl ecparam --provider /usr/local/lib/libsssProvider.so --provider default -name prime256v1:0xEF000001 -genkey -out tls_client_key_ref_0xEF000001.pem
+
+
+# Create Client key CSR. Use the provider to access the client key created in the previous file.
+openssl req --provider /usr/local/lib/libsssProvider.so --provider default -new -key tls_client_key_ref_0xEF000001.pem -subj "/CN=NXP_SE050_TLS_CLIENT_ECC" -out tls_client.csr
+
+
+# Create Client certificate
+openssl x509 -req -sha256 -days 4380 -in tls_client.csr -CAcreateserial -CA tls_rootca.cer -CAkey tls_rootca_key.pem -out tls_client.cer
+
+
+# Create Server key pair and certificate
+openssl ecparam -in prime256v1.pem -genkey -noout -out tls_server_key.pem
+openssl req -new -key tls_server_key.pem -subj "/CN=NXP_SE050_TLS_SERVER_ECC" -out tls_server.csr
+openssl x509 -req -sha256 -days 4380 -in tls_server.csr -CAcreateserial -CA tls_rootca.cer -CAkey tls_rootca_key.pem -out tls_server.cer
+
+```
+
+Run Server as
+
+```console
+openssl s_server -accept 8080 -no_ssl3 -named_curve prime256v1  -CAfile tls_rootca.cer  -cert tls_server.cer -key tls_server_key.pem -cipher ECDHE-ECDSA-AES128-SHA256 -Verify 2 -state -msg
+```
+
+Run Client as
+
+```console
+openssl s_client --provider default --provider /usr/local/lib/libsssProvider.so -connect 127.0.0.1:8080 -tls1_2 -CAfile tls_rootca.cer -cert tls_client.cer -key nxp:tls_client_key_ref_0xEF000001.pem -cipher ECDHE-ECDSA-AES128-SHA256 -state -msg
+```
+
+`` Note: TLS with NXP Provider will only work when the reference key is passed with the "nxp:" prefix.``
+
+### TLS client example using RSA keys
+
+Create client and server credentials as shown below
+
+```console
+# Create Root CA key pair and certificate
+openssl genrsa -out tls_rootca_key.pem 1024
+openssl req -x509 -new -nodes -key tls_rootca_key.pem -subj "/OU=NXP Plug Trust CA/CN=NXP RootCAvExxx" -days 4380 -out tls_rootca.cer
+
+
+# Create client key inside secure element
+openssl genrsa --provider /usr/local/lib/libsssProvider.so --provider default -out tls_client_key_ref_0xEF000011.pem 1024
+
+# Create Client key CSR. Use the provider to access the client key created in the previous file.
+openssl req -new --provider /usr/local/lib/libsssProvider.so --provider default -key tls_client_key_ref_0xEF000011.pem -subj "/CN=NXP_SE050_TLS_CLIENT_RSA" -out tls_client.csr
+
+# Create Client certificate
+openssl x509 -req --provider default -in tls_client.csr -CAcreateserial -out tls_client.cer -days 5000 -CA tls_rootca.cer -CAkey tls_rootca_key.pem
+
+
+# Create Server key pair and certificate
+openssl genrsa -out tls_server_key.pem 1024
+openssl req -new -key tls_server_key.pem -subj "/CN=NXP_SE050_TLS_SERVER_RSA" -out tls_server.csr
+openssl x509 -req -sha256 -days 4380 -in tls_server.csr -CAcreateserial -CA tls_rootca.cer -CAkey tls_rootca_key.pem -out tls_server.cer
+
+```
+
+Run Server as
+
+```console
+openssl s_server -accept 8080 -no_ssl3 -CAfile tls_rootca.cer -cert tls_server.cer -key tls_server_key.pem -Verify 2 -state -msg
+```
+
+Run Client as
+
+```console
+openssl s_client --provider default --provider /usr/local/lib/libsssProvider.so -connect 127.0.0.1:8080 -tls1_2 -CAfile tls_rootca.cer -cert tls_client.cer -key nxp:tls_client_key_ref_0xEF000011.pem -state -msg
 ```

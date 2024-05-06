@@ -4,7 +4,7 @@
  * @version 1.0
  * @par License
  *
- * Copyright 2022 NXP
+ * Copyright 2022,2024 NXP
  * SPDX-License-Identifier: Apache-2.0
  *
  * @par Description
@@ -19,38 +19,11 @@
 #include "sssProvider_main.h"
 #include <limits.h>
 
-/* ********************** Private funtions ******************* */
-
-static void *sss_file_store_object_open(void *provctx, const char *uri)
-{
-    sss_provider_store_obj_t *pStoreCtx = NULL;
-
-    sssProv_Print(LOG_DBG_ON, "Enter - %s \n", __FUNCTION__);
-
-    if (uri == NULL) {
-        return NULL;
-    }
-
-    if ((pStoreCtx = OPENSSL_zalloc(sizeof(sss_provider_store_obj_t))) == NULL) {
-        return NULL;
-    }
-
-    pStoreCtx->isFile   = 1;
-    pStoreCtx->pProvCtx = provctx;
-
-    // Opening the pem file
-    pStoreCtx->pFile = fopen(uri, "rb");
-    if (pStoreCtx->pFile == NULL) {
-        OPENSSL_clear_free(pStoreCtx, sizeof(sss_provider_store_obj_t));
-        pStoreCtx = NULL;
-    }
-
-    return pStoreCtx;
-}
+/* ********************** Public funtions ******************* */
 
 #define USE_OSSL_PARAM_CALLS 1
 
-static int sss_handle_ecc_ref_key(sss_provider_store_obj_t *pStoreCtx, EVP_PKEY *pEVPKey)
+int sss_handle_ecc_ref_key(sss_provider_store_obj_t *pStoreCtx, EVP_PKEY *pEVPKey)
 {
     int ret                       = 1;
     size_t i                      = 0;
@@ -137,23 +110,25 @@ static int sss_handle_ecc_ref_key(sss_provider_store_obj_t *pStoreCtx, EVP_PKEY 
     }
 #endif
 
-    ENSURE_OR_GO_CLEANUP(pStoreCtx->pProvCtx != NULL);
-    ENSURE_OR_GO_CLEANUP(pStoreCtx->pProvCtx->p_ex_sss_boot_ctx != NULL);
+    if(pStoreCtx->isFile) {
+        ENSURE_OR_GO_CLEANUP(pStoreCtx->pProvCtx != NULL);
+        ENSURE_OR_GO_CLEANUP(pStoreCtx->pProvCtx->p_ex_sss_boot_ctx != NULL);
 
-    status = sss_key_object_init(&(pStoreCtx->object), &pStoreCtx->pProvCtx->p_ex_sss_boot_ctx->ks);
-    ENSURE_OR_GO_CLEANUP(status == kStatus_SSS_Success);
+        status = sss_key_object_init(&(pStoreCtx->object), &pStoreCtx->pProvCtx->p_ex_sss_boot_ctx->ks);
+        ENSURE_OR_GO_CLEANUP(status == kStatus_SSS_Success);
 
-    status = sss_key_object_get_handle(&(pStoreCtx->object), pStoreCtx->keyid);
-    ENSURE_OR_GO_CLEANUP(status == kStatus_SSS_Success);
+        status = sss_key_object_get_handle(&(pStoreCtx->object), pStoreCtx->keyid);
+        ENSURE_OR_GO_CLEANUP(status == kStatus_SSS_Success);
+    }
 
     pStoreCtx->isFile = 0;
-
     ret = 0;
 cleanup:
     return ret;
 }
 
-static int sss_handle_rsa_ref_key(sss_provider_store_obj_t *pStoreCtx, EVP_PKEY *pEVPKey)
+
+int sss_handle_rsa_ref_key(sss_provider_store_obj_t *pStoreCtx, EVP_PKEY *pEVPKey)
 {
     int ret             = 1;
     sss_status_t status = kStatus_SSS_Fail;
@@ -179,20 +154,51 @@ static int sss_handle_rsa_ref_key(sss_provider_store_obj_t *pStoreCtx, EVP_PKEY 
     ENSURE_OR_GO_CLEANUP(keyid <= UINT32_MAX);
     pStoreCtx->keyid = keyid;
 
-    ENSURE_OR_GO_CLEANUP(pStoreCtx->pProvCtx != NULL);
-    ENSURE_OR_GO_CLEANUP(pStoreCtx->pProvCtx->p_ex_sss_boot_ctx != NULL);
+    if(pStoreCtx->isFile){
+        ENSURE_OR_GO_CLEANUP(pStoreCtx->pProvCtx != NULL);
+        ENSURE_OR_GO_CLEANUP(pStoreCtx->pProvCtx->p_ex_sss_boot_ctx != NULL);
 
-    status = sss_key_object_init(&(pStoreCtx->object), &pStoreCtx->pProvCtx->p_ex_sss_boot_ctx->ks);
-    ENSURE_OR_GO_CLEANUP(status == kStatus_SSS_Success);
+        status = sss_key_object_init(&(pStoreCtx->object), &pStoreCtx->pProvCtx->p_ex_sss_boot_ctx->ks);
+        ENSURE_OR_GO_CLEANUP(status == kStatus_SSS_Success);
 
-    status = sss_key_object_get_handle(&(pStoreCtx->object), pStoreCtx->keyid);
-    ENSURE_OR_GO_CLEANUP(status == kStatus_SSS_Success);
+        status = sss_key_object_get_handle(&(pStoreCtx->object), pStoreCtx->keyid);
+        ENSURE_OR_GO_CLEANUP(status == kStatus_SSS_Success);
+    }
 
     pStoreCtx->isFile = 0;
-
     ret = 0;
 cleanup:
     return ret;
+}
+
+
+/* ********************** Private funtions ******************* */
+
+static void *sss_file_store_object_open(void *provctx, const char *uri)
+{
+    sss_provider_store_obj_t *pStoreCtx = NULL;
+
+    sssProv_Print(LOG_DBG_ON, "Enter - %s \n", __FUNCTION__);
+
+    if (uri == NULL) {
+        return NULL;
+    }
+
+    if ((pStoreCtx = OPENSSL_zalloc(sizeof(sss_provider_store_obj_t))) == NULL) {
+        return NULL;
+    }
+
+    pStoreCtx->isFile   = 1;
+    pStoreCtx->pProvCtx = provctx;
+
+    // Opening the pem file
+    pStoreCtx->pFile = fopen(uri, "rb");
+    if (pStoreCtx->pFile == NULL) {
+        OPENSSL_clear_free(pStoreCtx, sizeof(sss_provider_store_obj_t));
+        pStoreCtx = NULL;
+    }
+
+    return pStoreCtx;
 }
 
 static int sss_file_store_object_load(

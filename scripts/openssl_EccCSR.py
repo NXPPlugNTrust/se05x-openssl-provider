@@ -43,7 +43,7 @@ def main():
         run("%s ecparam --provider %s --provider default -name %s -genkey -out %s" %(openssl_bin, provider, key_type, ref_ec_key_0xEF000003))
 
         log.info("\n########### Create CSR and Certificate for ket at location 0xEF000003 using openssl provider ###############")
-        run("%s req -new --provider %s --provider default -key %s -out %s %s" %(openssl_bin, provider, ref_ec_key_0xEF000003, output_csr, subject))
+        run("%s req -new --provider %s --provider default -key nxp:%s -out %s %s" %(openssl_bin, provider, ref_ec_key_0xEF000003, output_csr, subject))
         run("%s x509 -req --provider %s --provider default -in %s -CAcreateserial -out %s -days 5000 -CA %s -CAkey %s" %(openssl_bin, provider, output_csr, output_crt, rootca_cer, rootca_key))
         run("%s x509 -in %s -text -noout" %(openssl_bin, output_crt))
 

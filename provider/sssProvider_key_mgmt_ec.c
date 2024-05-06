@@ -323,7 +323,7 @@ static int sss_ec_keymgmt_export(void *keydata, int selection, OSSL_CALLBACK *pa
 
         if (selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) {
             params_tmp[0] = OSSL_PARAM_construct_octet_string(
-                OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY, &public_key[0], sizeof(public_key_len));
+                OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY, &public_key[0], sizeof(public_key));
             params_tmp[1] = OSSL_PARAM_construct_end();
             ENSURE_OR_GO_CLEANUP(EVP_PKEY_get_params(pStoreCtx->pEVPPkey, params_tmp) == 1);
             public_key_len = params_tmp[0].return_size;
@@ -377,7 +377,8 @@ static int sss_ec_keymgmt_export(void *keydata, int selection, OSSL_CALLBACK *pa
 
             if (pStoreCtx->pProvCtx->pKeyGen == NULL)
             {
-                params[i++] = OSSL_PARAM_construct_utf8_string(OSSL_PKEY_PARAM_PRIV_KEY, &privkey[0], pStoreCtx->key_len);
+                params[i++] =
+                    OSSL_PARAM_construct_utf8_string(OSSL_PKEY_PARAM_PRIV_KEY, (char*)&privkey[0], pStoreCtx->key_len);
             }
             params[i++] = OSSL_PARAM_construct_BN(OSSL_PKEY_PARAM_PRIV_KEY, &privkey[0], pStoreCtx->key_len);
 

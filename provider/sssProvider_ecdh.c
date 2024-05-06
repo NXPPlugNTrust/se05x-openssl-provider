@@ -99,6 +99,7 @@ static int sss_ecdh_keyexch_derive(void *ctx, unsigned char *secret, size_t *sec
     sss_se05x_session_t *pSession      = NULL;
     EVP_PKEY_CTX *evpCtx               = NULL;
     int openssl_ret                    = 0;
+    int evp_secretLen;
     sssProv_Print(LOG_DBG_ON, "Enter - %s \n", __FUNCTION__);
     ENSURE_OR_GO_CLEANUP(pEcdhctx != NULL);
     ENSURE_OR_GO_CLEANUP(pEcdhctx->pStoreObjCtx != NULL);
@@ -113,7 +114,11 @@ static int sss_ecdh_keyexch_derive(void *ctx, unsigned char *secret, size_t *sec
         ENSURE_OR_GO_CLEANUP(pSession != NULL);
 
         if (secret == NULL) {
-            *secretlen = EVP_PKEY_size(pEcdhctx->pPeerEVPPkey);
+            evp_secretLen = EVP_PKEY_size(pEcdhctx->pPeerEVPPkey);
+            if (evp_secretLen < 0) {
+                return 0;
+            }
+            *secretlen = (size_t)evp_secretLen;
             return (*secretlen > 0);
         }
         else {
@@ -143,7 +148,11 @@ static int sss_ecdh_keyexch_derive(void *ctx, unsigned char *secret, size_t *sec
     else {
         /* Roll back to software implementation */
         if (secret == NULL) {
-            *secretlen = EVP_PKEY_size(pEcdhctx->pPeerEVPPkey);
+            evp_secretLen = EVP_PKEY_size(pEcdhctx->pPeerEVPPkey);
+            if (evp_secretLen < 0) {
+                return 0;
+            }
+            *secretlen = (size_t)evp_secretLen;
             return (*secretlen > 0);
         }
         else {

@@ -40,7 +40,7 @@ def main():
         log.info("#################################################### \n")
 
         log.info("\nSign using Provider (Using reference keys) ")
-        run("%s pkeyutl --provider %s --provider default -inkey %s -sign -rawin -in %s -out %s -digest %s" % (openssl_bin, provider, ref_ec_key_0xEF000003, input_data, signature, sha_type))
+        run("%s pkeyutl --provider %s --provider default -inkey nxp:%s -sign -rawin -in %s -out %s -digest %s" % (openssl_bin, provider, ref_ec_key_0xEF000003, input_data, signature, sha_type))
         log.info("###################################################")
         log.info("\nVerify signature using host  ")
         run("%s pkeyutl -verify -inkey %s -sigfile %s -in %s -rawin -digest %s"%(openssl_bin, ref_ec_key_0xEF000003, signature, input_data, sha_type))

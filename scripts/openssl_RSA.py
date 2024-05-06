@@ -46,14 +46,14 @@ def main():
         run("%s pkeyutl --provider %s --provider default -inkey %s -sign -rawin -in %s -out %s -digest %s" % (openssl_bin, provider, keyid_label, input_data, signature, sha_type))
         log.info("###################################################")
         log.info("\nVerify signature using Provider  ")
-        run("%s pkeyutl --provider %s --provider default -verify -inkey %s -sigfile %s -in %s -rawin -digest %s"%(openssl_bin, provider, ref_rsa_key_0xEF000011, signature, input_data, sha_type))
+        run("%s pkeyutl --provider %s --provider default -verify -inkey nxp:%s -sigfile %s -in %s -rawin -digest %s"%(openssl_bin, provider, ref_rsa_key_0xEF000011, signature, input_data, sha_type))
         log.info("#################################################### \n")
 
         log.info("\nSign using Provider (Using reference keys) ")
-        run("%s pkeyutl --provider %s --provider default -inkey %s -sign -rawin -in %s -out %s -digest %s" % (openssl_bin, provider, ref_rsa_key_0xEF000011, input_data, signature, sha_type))
+        run("%s pkeyutl --provider %s --provider default -inkey nxp:%s -sign -rawin -in %s -out %s -digest %s" % (openssl_bin, provider, ref_rsa_key_0xEF000011, input_data, signature, sha_type))
         log.info("###################################################")
         log.info("\nVerify signature using Provider  ")
-        run("%s pkeyutl --provider %s --provider default -verify -inkey %s -sigfile %s -in %s -rawin -digest %s"%(openssl_bin, provider, ref_rsa_key_0xEF000011, signature, input_data, sha_type))
+        run("%s pkeyutl --provider %s --provider default -verify -inkey nxp:%s -sigfile %s -in %s -rawin -digest %s"%(openssl_bin, provider, ref_rsa_key_0xEF000011, signature, input_data, sha_type))
         log.info("#################################################### \n")
 
 

@@ -4,7 +4,7 @@
  * @version 1.0
  * @par License
  *
- * Copyright 2022 NXP
+ * Copyright 2022,2024 NXP
  * SPDX-License-Identifier: Apache-2.0
  *
  * @par Description
@@ -57,6 +57,7 @@ static int sss_get_rsa_key_len_cipher_type(uint32_t bits, uint32_t *cipherType, 
     }
     return 0;
 }
+
 static void *sss_rsa_keymgmt_load(const void *reference, size_t reference_sz)
 {
     sss_provider_store_obj_t *pStoreCtx = NULL;
@@ -89,8 +90,6 @@ static int sss_rsa_keymgmt_get_params(void *keydata, OSSL_PARAM params[])
     uint8_t public_key[256] = {0};
     size_t public_key_len   = sizeof(public_key);
     size_t pbKeyBitLen      = sizeof(public_key) * 8;
-    uint8_t exponent[4]     = {0};
-    size_t expLen           = sizeof(exponent);
 
     sssProv_Print(LOG_DBG_ON, "Enter - %s \n", __FUNCTION__);
 
@@ -156,18 +155,6 @@ static int sss_rsa_keymgmt_get_params(void *keydata, OSSL_PARAM params[])
             }
         }
 
-        p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_RSA_E);
-        if (p != NULL) {
-            BIGNUM *bn_exp = NULL;
-            smStatus       = Se05x_API_ReadRSA(
-                &pSession->s_ctx, pStoreCtx->object.keyId, 0, 0, kSE05x_RSAPubKeyComp_PUB_EXP, exponent, &expLen);
-            ENSURE_OR_GO_CLEANUP(smStatus == SM_OK);
-            bn_exp = BN_bin2bn(exponent, expLen, NULL);
-            if (!OSSL_PARAM_set_BN(p, bn_exp)) {
-                goto cleanup;
-            }
-        }
-
         p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_DEFAULT_DIGEST);
         if ((p != NULL) && (!OSSL_PARAM_set_utf8_string(p, "SHA256"))) {
             goto cleanup;
@@ -190,9 +177,7 @@ static const OSSL_PARAM *sss_rsa_keymgmt_gettable_params(void *provctx)
         OSSL_PARAM_int(OSSL_PKEY_PARAM_MAX_SIZE, NULL),
         OSSL_PARAM_utf8_string(OSSL_PKEY_PARAM_MANDATORY_DIGEST, NULL, 0),
         OSSL_PARAM_utf8_string(OSSL_PKEY_PARAM_DEFAULT_DIGEST, NULL, 0),
-        /*Public Key */
         OSSL_PARAM_BN(OSSL_PKEY_PARAM_PUB_KEY, NULL, 0),
-        OSSL_PARAM_BN(OSSL_PKEY_PARAM_RSA_E, NULL, 0),
         OSSL_PARAM_END};
     sssProv_Print(LOG_DBG_ON, "Enter - %s \n", __FUNCTION__);
     (void)(provctx);
@@ -202,8 +187,15 @@ static const OSSL_PARAM *sss_rsa_keymgmt_gettable_params(void *provctx)
 static const char *sss_rsa_keymgmt_query_operation_name(int operation_id)
 {
     sssProv_Print(LOG_DBG_ON, "Enter - %s \n", __FUNCTION__);
-    (void)(operation_id);
-    return "RSA";
+    if (operation_id == OSSL_OP_SIGNATURE) {
+        return "RSASSA-SE05X";
+    }
+    else if (operation_id == OSSL_OP_ASYM_CIPHER) {
+        return "RSAENC-SE05X";
+    }
+    else {
+        return "RSA";
+    }
 }
 
 static int sss_rsa_keymgmt_has(const void *keydata, int selection)
@@ -282,51 +274,85 @@ static int sss_rsa_keymgmt_export(void *keydata, int selection, OSSL_CALLBACK *p
     uint8_t cofficient[4]               = {0xB6, 0xB5, 0xA6, 0xA5}; /*Magic Number*/
     smStatus_t sm_status                = SM_NOT_OK;
     sss_se05x_session_t *pSession       = (sss_se05x_session_t *)&pStoreCtx->pProvCtx->p_ex_sss_boot_ctx->session;
+    OSSL_PARAM params_tmp[2]                = {
+        0,
+    };
 
     sssProv_Print(LOG_DBG_ON, "Enter - %s \n", __FUNCTION__);
 
-    if (selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) {
-        sm_status = Se05x_API_ReadRSA(
-            &pSession->s_ctx, pStoreCtx->object.keyId, 0, 0, kSE05x_RSAPubKeyComp_MOD, modulus, &modLen);
-        ENSURE_OR_GO_CLEANUP(sm_status == SM_OK);
+    if (pStoreCtx->isFile == 1) {
+        ENSURE_OR_GO_CLEANUP(pStoreCtx->pEVPPkey != NULL);
 
-        sm_status = Se05x_API_ReadRSA(&pSession->s_ctx,
-            pStoreCtx->object.keyId,
-            0,
-            0,
-            kSE05x_RSAPubKeyComp_PUB_EXP,
-            pubExponent,
-            &pubExponentLen);
-        ENSURE_OR_GO_CLEANUP(sm_status == SM_OK);
+        if (selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) {
+            params_tmp[0] = OSSL_PARAM_construct_BN(OSSL_PKEY_PARAM_RSA_N, modulus, modLen);
+            params_tmp[1] = OSSL_PARAM_construct_end();
+            ENSURE_OR_GO_CLEANUP(EVP_PKEY_get_params(pStoreCtx->pEVPPkey, params_tmp) == 1);
+            modLen = params_tmp[0].return_size;
+            params[i++]    = OSSL_PARAM_construct_BN(OSSL_PKEY_PARAM_RSA_N, modulus, modLen);
 
-        params[i++] = OSSL_PARAM_construct_BN(OSSL_PKEY_PARAM_RSA_N, modulus, modLen);             /* Modulus */
-        params[i++] = OSSL_PARAM_construct_BN(OSSL_PKEY_PARAM_RSA_E, pubExponent, pubExponentLen); /* Public Exponent */
+            params_tmp[0] = OSSL_PARAM_construct_BN(OSSL_PKEY_PARAM_RSA_E, pubExponent, pubExponentLen);
+            params_tmp[1] = OSSL_PARAM_construct_end();
+            ENSURE_OR_GO_CLEANUP(EVP_PKEY_get_params(pStoreCtx->pEVPPkey, params_tmp) == 1);
+            pubExponentLen      = params_tmp[0].return_size;
+            params[i++]    = OSSL_PARAM_construct_BN(OSSL_PKEY_PARAM_RSA_E, pubExponent, pubExponentLen);
+        }
+
+        params[i++] = OSSL_PARAM_construct_end();
     }
+    else {
+        if (selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) {
+            sm_status = Se05x_API_ReadRSA(
+                &pSession->s_ctx, pStoreCtx->object.keyId, 0, 0, kSE05x_RSAPubKeyComp_MOD, modulus, &modLen);
+            ENSURE_OR_GO_CLEANUP(sm_status == SM_OK);
 
-    params[i++] =
-        OSSL_PARAM_construct_BN(OSSL_PKEY_PARAM_RSA_D, &privexponent[0], sizeof(privexponent)); /* Private Exponent */
+            sm_status = Se05x_API_ReadRSA(&pSession->s_ctx,
+                pStoreCtx->object.keyId,
+                0,
+                0,
+                kSE05x_RSAPubKeyComp_PUB_EXP,
+                pubExponent,
+                &pubExponentLen);
+            ENSURE_OR_GO_CLEANUP(sm_status == SM_OK);
 
-    params[i++] =
-        OSSL_PARAM_construct_BN(OSSL_PKEY_PARAM_RSA_FACTOR1, &prime1[0], sizeof(prime1)); /* 0x01 -Reserved  */
+            // reverse the moduluse
+            {
+                int m       = 0;
+                int n       = modLen - 1;
+                uint8_t tmp = 0;
+                for (; m < n; m++, n--) {
+                    if ((n < 0) || (n >= (int)sizeof(modulus))) {
+                        return 0;
+                    }
+                    tmp        = modulus[m];
+                    modulus[m] = modulus[n];
+                    modulus[n] = tmp;
+                }
+            }
 
-    memcpy(&prime2[0], &pStoreCtx->keyid, sizeof(pStoreCtx->keyid));
-    params[i++] =
-        OSSL_PARAM_construct_BN(OSSL_PKEY_PARAM_RSA_FACTOR2, &prime2[0], sizeof(prime2)); /*Key id Information*/
-    params[i++] =
-        OSSL_PARAM_construct_BN(OSSL_PKEY_PARAM_RSA_FACTOR3, &prime2[0], sizeof(prime2)); /*Key id Information*/
+            params[i++] = OSSL_PARAM_construct_BN(OSSL_PKEY_PARAM_RSA_N, modulus, modLen);             /* Modulus */
+            params[i++] = OSSL_PARAM_construct_BN(OSSL_PKEY_PARAM_RSA_E, pubExponent, pubExponentLen); /* Public Exponent */
+        }
 
-    params[i++] = OSSL_PARAM_construct_BN(OSSL_PKEY_PARAM_RSA_EXPONENT1, &exponent1[0], sizeof(exponent1));
-    params[i++] = OSSL_PARAM_construct_BN(OSSL_PKEY_PARAM_RSA_EXPONENT2, &exponent1[0], sizeof(exponent1));
-    params[i++] = OSSL_PARAM_construct_BN(OSSL_PKEY_PARAM_RSA_EXPONENT3, &exponent1[0], sizeof(exponent1));
+        if (selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) {
+            params[i++] = OSSL_PARAM_construct_BN(
+                OSSL_PKEY_PARAM_RSA_D, &privexponent[0], sizeof(privexponent)); /* Private Exponent */
 
-    params[i++] =
-        OSSL_PARAM_construct_BN(OSSL_PKEY_PARAM_RSA_COEFFICIENT, &cofficient[0], sizeof(cofficient)); /* Magic Number */
-    params[i++] = OSSL_PARAM_construct_BN(
-        OSSL_PKEY_PARAM_RSA_COEFFICIENT1, &cofficient[0], sizeof(cofficient)); /* Magic Number */
-    params[i++] = OSSL_PARAM_construct_BN(
-        OSSL_PKEY_PARAM_RSA_COEFFICIENT2, &cofficient[0], sizeof(cofficient)); /* Magic Number */
+            params[i++] =
+                OSSL_PARAM_construct_BN(OSSL_PKEY_PARAM_RSA_FACTOR1, &prime1[0], sizeof(prime1)); /* 0x01 -Reserved  */
 
-    params[i++] = OSSL_PARAM_construct_end();
+            memcpy(&prime2[0], &pStoreCtx->keyid, sizeof(pStoreCtx->keyid));
+            params[i++] =
+                OSSL_PARAM_construct_BN(OSSL_PKEY_PARAM_RSA_FACTOR2, &prime2[0], sizeof(prime2)); /*Key id Information*/
+
+            params[i++] = OSSL_PARAM_construct_BN(OSSL_PKEY_PARAM_RSA_EXPONENT1, &exponent1[0], sizeof(exponent1));
+            params[i++] = OSSL_PARAM_construct_BN(OSSL_PKEY_PARAM_RSA_EXPONENT2, &exponent1[0], sizeof(exponent1));
+
+            params[i++] = OSSL_PARAM_construct_BN(
+                OSSL_PKEY_PARAM_RSA_COEFFICIENT1, &cofficient[0], sizeof(cofficient)); /* Magic Number */
+        }
+
+        params[i++] = OSSL_PARAM_construct_end();
+    }
 
     return param_cb(params, cbarg);
 
@@ -341,12 +367,12 @@ static const OSSL_PARAM *sss_rsa_keymgmt_export_types(int selection)
     exporatble[0] = OSSL_PARAM_construct_octet_string(OSSL_PKEY_PARAM_RSA_N, 0, 0);
     exporatble[1] = OSSL_PARAM_construct_octet_string(OSSL_PKEY_PARAM_RSA_E, 0, 0);
     exporatble[2] = OSSL_PARAM_construct_BN(OSSL_PKEY_PARAM_RSA_D, NULL, 0);
-    exporatble[2] = OSSL_PARAM_construct_int(OSSL_PKEY_PARAM_RSA_FACTOR1, NULL);
-    exporatble[3] = OSSL_PARAM_construct_int(OSSL_PKEY_PARAM_RSA_FACTOR2, NULL);
-    exporatble[4] = OSSL_PARAM_construct_int(OSSL_PKEY_PARAM_RSA_EXPONENT1, NULL),
+    exporatble[3] = OSSL_PARAM_construct_int(OSSL_PKEY_PARAM_RSA_FACTOR1, NULL);
+    exporatble[4] = OSSL_PARAM_construct_int(OSSL_PKEY_PARAM_RSA_FACTOR2, NULL);
+    exporatble[5] = OSSL_PARAM_construct_int(OSSL_PKEY_PARAM_RSA_EXPONENT1, NULL),
     exporatble[6] = OSSL_PARAM_construct_BN(OSSL_PKEY_PARAM_RSA_EXPONENT2, NULL, 0),
-    exporatble[7] = OSSL_PARAM_construct_int(OSSL_PKEY_PARAM_RSA_COEFFICIENT, NULL),
-    exporatble[5] = OSSL_PARAM_construct_end();
+    exporatble[7] = OSSL_PARAM_construct_int(OSSL_PKEY_PARAM_RSA_COEFFICIENT1, NULL),
+    exporatble[8] = OSSL_PARAM_construct_end();
     (void)(selection);
     return exporatble;
 }
@@ -378,6 +404,8 @@ static int sss_keymgmt_rsa_gen_set_params(void *keydata, const OSSL_PARAM params
     int index = 0;
 
     sssProv_Print(LOG_DBG_ON, "Enter - %s \n", __FUNCTION__);
+
+    (void)(keydata);
 
     ENSURE_OR_GO_CLEANUP(params != NULL);
     ENSURE_OR_GO_CLEANUP(pStoreCtx != NULL);

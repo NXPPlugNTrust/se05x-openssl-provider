@@ -41,7 +41,7 @@ def main():
         run("%s pkeyutl -derive --provider %s --provider default -inkey nxp:0xEF000003 -peerkey %s -hexdump -out %s" %(openssl_bin, provider, peer_pubKey, ecdh_out))
 
         log.info("############## Do ECDH with provider (using reference keys) ##########")
-        run("%s pkeyutl -derive --provider %s --provider default -inkey %s -peerkey %s -hexdump -out %s" %(openssl_bin, provider, ref_ec_key_0xEF000003, peer_pubKey, ecdh_out))
+        run("%s pkeyutl -derive --provider %s --provider default -inkey nxp:%s -peerkey %s -hexdump -out %s" %(openssl_bin, provider, ref_ec_key_0xEF000003, peer_pubKey, ecdh_out))
 
         log.info("\n\n")
 

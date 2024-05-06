@@ -1,7 +1,7 @@
 
 /*
  * Copyright 2019-2021 The OpenSSL Project Authors. All Rights Reserved.
- * Copyright 2022-2023 NXP
+ * Copyright 2022-2024 NXP
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -32,7 +32,7 @@
 
 /* ********************** Constants ************************** */
 #define SSS_PROVIDER_NAME "NXP Provider"
-#define SSS_PROVIDER_VERSION "1.0.1"
+#define SSS_PROVIDER_VERSION "1.0.2"
 #define SSSPROV_MAX_PRINT_BUF_SIZE (511)
 
 /* ********************** Global variables ************************** */
@@ -102,6 +102,10 @@ static const OSSL_ALGORITHM sss_keymgmts[] = {
 #endif //#if SSS_HAVE_RSA
     {NULL, NULL, NULL}};
 
+extern const OSSL_DISPATCH sss_rsa_enc_functions[];
+static const OSSL_ALGORITHM sss_rsa_enc[] = {
+    {"RSAENC-SE05X", "provider=nxp_prov", sss_rsa_enc_functions}, {NULL, NULL, NULL}};
+
 #if SSS_HAVE_ECC
 extern const OSSL_DISPATCH sss_ecdsa_signature_functions[];
 #endif //#if SSS_HAVE_ECC
@@ -115,7 +119,7 @@ static const OSSL_ALGORITHM sss_signatures[] = {
     {"ECDSA", "provider=nxp_prov", sss_ecdsa_signature_functions},
 #endif //#if SSS_HAVE_ECC
 #if SSS_HAVE_RSA
-    {"RSA:rsaEncryption", "provider=nxp_prov", sss_rsa_signature_functions},
+    {"RSASSA-SE05X", "provider=nxp_prov", sss_rsa_signature_functions},
 #endif
     {NULL, NULL, NULL}};
 
@@ -124,7 +128,10 @@ extern const OSSL_DISPATCH sss_ecdh_keyexch_functions[];
 #endif //#if SSS_HAVE_ECC
 
 static const OSSL_ALGORITHM sss_keyexchs[] = {
-    {"ECDH", "provider=nxp_prov", sss_ecdh_keyexch_functions}, {NULL, NULL, NULL}};
+#if SSS_HAVE_ECC
+    {"ECDH", "provider=nxp_prov", sss_ecdh_keyexch_functions},
+#endif
+    {NULL, NULL, NULL}};
 
 extern const OSSL_DISPATCH sss_store_object_functions[];
 extern const OSSL_DISPATCH sss_file_store_object_functions[];
@@ -147,6 +154,8 @@ static const OSSL_ALGORITHM *sss_query_operation(void *provctx, int operation_id
         return sss_store;
     case OSSL_OP_KEYEXCH:
         return sss_keyexchs;
+    case OSSL_OP_ASYM_CIPHER:
+        return sss_rsa_enc;
 
     default:
         return NULL;
@@ -176,7 +185,7 @@ OPENSSL_EXPORT int OSSL_provider_init(
     sss_status_t status = kStatus_SSS_Fail;
     char *portName;
 
-    // Load default provider to use random generation during SCP connection
+    //Load default provider to use random generation during SCP03 connection
     //if (NULL == OSSL_PROVIDER_load(NULL, "default")) {
     //    sssProv_Print(LOG_FLOW_ON, "error in OSSL_PROVIDER_load \n");
     //}
@@ -213,7 +222,7 @@ OPENSSL_EXPORT int OSSL_provider_init(
     // Open host session
     status = ex_sss_boot_open_host_session(&gProvider_boot_ctx);
     if (kStatus_SSS_Success != status) {
-        sssProv_Print(LOG_DBG_ON, "Error in host session open. Some operations may fail");
+        sssProv_Print(LOG_DBG_ON, "Error in host session open. Some operations may fail \n");
     }
 #endif
 

@@ -4,7 +4,7 @@
  * @version 1.0
  * @par License
  *
- * Copyright 2022 NXP
+ * Copyright 2022,2024 NXP
  * SPDX-License-Identifier: Apache-2.0
  *
  * @par Description
@@ -15,16 +15,26 @@
 /* ********************** Include files ********************** */
 #include <openssl/core_names.h>
 #include <openssl/core_object.h>
+#include <string.h>
+#include <openssl/pem.h>
 #include "sssProvider_main.h"
+
+/* ********************** Funtions declarations ******************* */
+
+int sss_handle_ecc_ref_key(sss_provider_store_obj_t *pStoreCtx, EVP_PKEY *pEVPKey);
+int sss_handle_rsa_ref_key(sss_provider_store_obj_t *pStoreCtx, EVP_PKEY *pEVPKey);
 
 /* ********************** Private funtions ******************* */
 
 static void *sss_store_object_open(void *provctx, const char *uri)
 {
     sss_provider_store_obj_t *pStoreCtx;
+    FILE *pFile             = NULL;
     char *baseuri           = NULL;
     char *endptr            = NULL;
     unsigned long int value = 0;
+    EVP_PKEY *pEVPKey       = NULL;
+    int ret                 = 1;
 
     sssProv_Print(LOG_DBG_ON, "Enter - %s \n", __FUNCTION__);
 
@@ -38,18 +48,95 @@ static void *sss_store_object_open(void *provctx, const char *uri)
         return NULL;
     }
 
-    // converting string str  to unsigned long int value base on the base
-    // extracting the keyid from the uri nxp:0xxxxxxxxx"
-    value = strtoul((baseuri + 4), &endptr, 16);
-    if (*endptr != 0 || value > UINT32_MAX) {
-        OPENSSL_free(pStoreCtx);
-        OPENSSL_free(baseuri);
-        return NULL;
+    if (strncmp(baseuri, "nxp:0x", 6) == 0) {
+        // converting string str  to unsigned long int value base on the base
+        // extracting the keyid from the uri nxp:0xxxxxxxxx"
+        value = strtoul((baseuri + 4), &endptr, 16);
+        if (*endptr != 0 || value > UINT32_MAX) {
+            OPENSSL_free(pStoreCtx);
+            OPENSSL_free(baseuri);
+            return NULL;
+        }
+
+        pStoreCtx->keyid    = value;
+        pStoreCtx->pProvCtx = provctx;
+        pStoreCtx->isFile   = 0;
+    }
+    else {
+        //Extracting the file path
+        char *filePath = strchr(baseuri, ':');
+        if (filePath != NULL) {
+            filePath++;
+        }
+        else {
+            OPENSSL_free(pStoreCtx);
+            OPENSSL_free(baseuri);
+            return NULL;
+        }
+        // Opening the pem file
+        pFile = fopen(filePath, "rb");
+        if (pFile == NULL) {
+            OPENSSL_free(pStoreCtx);
+            OPENSSL_free(baseuri);
+            return NULL;
+        }
+
+        // Read Pem file
+        pEVPKey = PEM_read_PrivateKey(pFile, NULL, NULL, NULL);
+        if (pEVPKey == NULL) {
+            if (fclose(pFile) != 0) {
+                sssProv_Print(LOG_FLOW_ON, "file close failed \n");
+            }
+            OPENSSL_free(pStoreCtx);
+            OPENSSL_free(baseuri);
+            return NULL;
+        }
+
+        // reference key is a private key
+        pStoreCtx->isPrivateKey = true;
+
+        if (EVP_PKEY_id(pEVPKey) == EVP_PKEY_EC) {
+            ret = sss_handle_ecc_ref_key(pStoreCtx, pEVPKey);
+            if (ret != 0) {
+                /* Not a ref key */
+                sssProv_Print(LOG_FLOW_ON, "Not a ref key \n");
+                if (fclose(pFile) != 0) {
+                    sssProv_Print(LOG_FLOW_ON, "file close failed \n");
+                }
+                OPENSSL_free(pStoreCtx);
+                OPENSSL_free(baseuri);
+                return NULL;
+            }
+        }
+        else if (EVP_PKEY_id(pEVPKey) == EVP_PKEY_RSA) {
+            ret = sss_handle_rsa_ref_key(pStoreCtx, pEVPKey);
+            if (ret != 0) {
+                /* Not a ref key */
+                sssProv_Print(LOG_FLOW_ON, "Not a ref key \n");
+                if (fclose(pFile) != 0) {
+                    sssProv_Print(LOG_FLOW_ON, "file close failed \n");
+                }
+                OPENSSL_free(pStoreCtx);
+                OPENSSL_free(baseuri);
+                return NULL;
+            }
+        }
+        else {
+            sssProv_Print(LOG_FLOW_ON, "Unknown Key type \n");
+            if (fclose(pFile) != 0) {
+                sssProv_Print(LOG_FLOW_ON, "file close failed \n");
+            }
+            OPENSSL_free(pStoreCtx);
+            OPENSSL_free(baseuri);
+            return NULL;
+        }
+
+        pStoreCtx->pProvCtx = provctx;
+        if (fclose(pFile) != 0) {
+            sssProv_Print(LOG_FLOW_ON, "file close failed \n");
+        }
     }
 
-    pStoreCtx->keyid    = value;
-    pStoreCtx->pProvCtx = provctx;
-    pStoreCtx->isFile   = 0;
     if (baseuri != NULL) {
         OPENSSL_free(baseuri);
     }
