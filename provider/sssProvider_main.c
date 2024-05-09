@@ -102,9 +102,11 @@ static const OSSL_ALGORITHM sss_keymgmts[] = {
 #endif //#if SSS_HAVE_RSA
     {NULL, NULL, NULL}};
 
+#if SSS_HAVE_RSA
 extern const OSSL_DISPATCH sss_rsa_enc_functions[];
 static const OSSL_ALGORITHM sss_rsa_enc[] = {
     {"RSAENC-SE05X", "provider=nxp_prov", sss_rsa_enc_functions}, {NULL, NULL, NULL}};
+#endif //#if SSS_HAVE_RSA
 
 #if SSS_HAVE_ECC
 extern const OSSL_DISPATCH sss_ecdsa_signature_functions[];
@@ -154,9 +156,10 @@ static const OSSL_ALGORITHM *sss_query_operation(void *provctx, int operation_id
         return sss_store;
     case OSSL_OP_KEYEXCH:
         return sss_keyexchs;
+#if SSS_HAVE_RSA
     case OSSL_OP_ASYM_CIPHER:
         return sss_rsa_enc;
-
+#endif //#if SSS_HAVE_RSA
     default:
         return NULL;
     }
