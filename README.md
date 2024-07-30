@@ -14,6 +14,8 @@ the following functionality can be made available over the OpenSSL provider here
   - CSR
 - RSA crypto
   - RSA sign/verify
+  - RSA encrypt/decrypt
+  - CSR
 - Random generator
 
 The OpenSSL provider is compatible with OpenSSL versions 3.0.x
