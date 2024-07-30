@@ -67,7 +67,7 @@ Uncomment the below code in `sssProvider_main.c`.
     //    sssProv_Print(LOG_FLOW_ON, "error in OSSL_PROVIDER_load \n");
     //}
 
-However, this will make the default provider with high priority and operations like key generation and referencing secure element with file based reference keys will not work.
+With this change, random number generation will not be offloaded to secure element.
 
 ```
 
@@ -158,7 +158,7 @@ openssl genrsa --provider /usr/local/lib/libsssProvider.so --provider default -o
 
 The above command will generate the key in secure element at location 0xEF000011 and the output ``(se05x_rsa2048_ref.pem)`` is the reference to the key location of secure element. Refer [Referencing keys in the secure element](#Referencing-keys-in-the-secure-element) section for more details.
 
-``NOTE: Key id cannot be passed via command line. Every time the generate key command will overwrite the RSA key created at location 0xEF000011``
+``NOTE: Key id cannot be passed via command line. Every time the generate key command will overwrite the RSA key created at location 0xEF000011. (the key id can be changed in file sssProvider_key_mgmt_rsa.c (SSS_DEFAULT_RSA_KEY_ID))``
 
 Supported RSA bits - 1024, 2048, 3072, 4096
 
@@ -417,7 +417,7 @@ openssl s_server -accept 8080 -no_ssl3 -named_curve prime256v1  -CAfile tls_root
 Run Client as
 
 ```console
-openssl s_client --provider default --provider /usr/local/lib/libsssProvider.so -connect 127.0.0.1:8080 -tls1_2 -CAfile tls_rootca.cer -cert tls_client.cer -key nxp:tls_client_key_ref_0xEF000002.pem -cipher ECDHE-ECDSA-AES128-SHA256 -state -msg
+openssl s_client --provider /usr/local/lib/libsssProvider.so --provider default -connect 127.0.0.1:8080 -tls1_2 -CAfile tls_rootca.cer -cert tls_client.cer -key tls_client_key_ref_0xEF000002.pem -cipher ECDHE-ECDSA-AES128-SHA256 -state -msg
 ```
 
 ### TLS client example using RSA keys
