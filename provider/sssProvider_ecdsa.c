@@ -4,7 +4,7 @@
  * @version 1.0
  * @par License
  *
- * Copyright 2022 NXP
+ * Copyright 2022,2024 NXP
  * SPDX-License-Identifier: Apache-2.0
  *
  * @par Description
@@ -58,10 +58,6 @@ static void sss_ecdsa_signature_freectx(void *ctx)
     sss_provider_ecdsa_ctx_st *sctx = ctx;
     sssProv_Print(LOG_DBG_ON, "Enter - %s \n", __FUNCTION__);
     if (sctx != NULL) {
-        if (sctx->pStoreObjCtx->pEVPPkey != NULL) {
-            EVP_PKEY_free(sctx->pStoreObjCtx->pEVPPkey);
-            sctx->pStoreObjCtx->pEVPPkey = NULL;
-        }
         OPENSSL_clear_free(sctx, sizeof(sss_provider_ecdsa_ctx_st));
     }
     return;

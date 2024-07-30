@@ -4,7 +4,7 @@
  * @version 1.0
  * @par License
  *
- * Copyright 2022 NXP
+ * Copyright 2022,2024 NXP
  * SPDX-License-Identifier: Apache-2.0
  *
  * @par Description
@@ -52,12 +52,6 @@ static void sss_ecdh_keyexch_freectx(void *ctx)
         if (pEcdhctx->pPeerEVPPkey != NULL) {
             EVP_PKEY_free(pEcdhctx->pPeerEVPPkey);
             pEcdhctx->pPeerEVPPkey = NULL;
-        }
-        if (pEcdhctx->pStoreObjCtx != NULL) {
-            if (pEcdhctx->pStoreObjCtx->pEVPPkey != NULL) {
-                EVP_PKEY_free(pEcdhctx->pStoreObjCtx->pEVPPkey);
-                pEcdhctx->pStoreObjCtx->pEVPPkey = NULL;
-            }
         }
         OPENSSL_clear_free(pEcdhctx, sizeof(sss_provider_ecdh_ctx_st));
     }

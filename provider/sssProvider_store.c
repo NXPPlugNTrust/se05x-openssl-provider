@@ -140,6 +140,9 @@ static void *sss_store_object_open(void *provctx, const char *uri)
     if (baseuri != NULL) {
         OPENSSL_free(baseuri);
     }
+    if (pEVPKey != NULL) {
+        EVP_PKEY_free(pEVPKey);
+    }
     return pStoreCtx;
 }
 

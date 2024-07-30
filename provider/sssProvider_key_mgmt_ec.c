@@ -4,7 +4,7 @@
  * @version 1.0
  * @par License
  *
- * Copyright 2022 NXP
+ * Copyright 2022,2024 NXP
  * SPDX-License-Identifier: Apache-2.0
  *
  * @par Description
@@ -23,6 +23,7 @@
 /* ********************** Include files ********************** */
 #include <openssl/core_names.h>
 #include <openssl/pem.h>
+#include <openssl/decoder.h>
 #include "sssProvider_main.h"
 #include <limits.h>
 #include <string.h>
@@ -84,7 +85,16 @@ static void *sss_ec_keymgmt_load(const void *reference, size_t reference_sz)
 
 static void sss_ec_keymgmt_free(void *keydata)
 {
+    sss_provider_store_obj_t *pStoreCtx     = (sss_provider_store_obj_t *)keydata;
     sssProv_Print(LOG_DBG_ON, "Enter - %s \n", __FUNCTION__);
+
+    if (pStoreCtx != NULL) {
+        if (pStoreCtx->pEVPPkey != NULL) {
+            EVP_PKEY_free(pStoreCtx->pEVPPkey);
+            pStoreCtx->pEVPPkey = NULL;
+        }
+    }
+
     if (keydata != NULL) {
         OPENSSL_free(keydata);
     }
@@ -128,6 +138,10 @@ static int sss_ec_keymgmt_get_params(void *keydata, OSSL_PARAM params[])
         }
         p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_MAX_SIZE);
         if (p != NULL && !OSSL_PARAM_set_int(p, pStoreCtx->maxSize)) { /* Signature size */
+            goto cleanup;
+        }
+        p =  OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY);
+        if (p != NULL && !EVP_PKEY_get_params(pStoreCtx->pEVPPkey, params)) {
             goto cleanup;
         }
     }
@@ -203,11 +217,45 @@ static int sss_ec_keymgmt_get_params(void *keydata, OSSL_PARAM params[])
         if ((p != NULL) && (!OSSL_PARAM_set_utf8_string(p, "SHA256"))) {
             goto cleanup;
         }
+
+        p =  OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY);
+        if (p != NULL && !EVP_PKEY_get_params(pStoreCtx->pEVPPkey, params)) {
+            goto cleanup;
+        }
     }
 
     ret = 1;
 cleanup:
     return ret;
+}
+
+static const OSSL_PARAM ec_settable_params[] = {
+    OSSL_PARAM_octet_string(OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY, NULL, 0),
+    OSSL_PARAM_END
+};
+
+static int sss_ec_keymgmt_set_params(void *keydata, OSSL_PARAM params[])
+{
+    sss_provider_store_obj_t *pStoreCtx     = (sss_provider_store_obj_t *)keydata;
+    OSSL_PARAM *p                           = NULL;
+
+    sssProv_Print(LOG_DBG_ON, "Enter - %s \n", __FUNCTION__);
+
+    if (params == NULL) {
+        return 1;
+    }
+
+    ENSURE_OR_GO_CLEANUP(pStoreCtx != NULL);
+    ENSURE_OR_GO_CLEANUP(pStoreCtx->pEVPPkey != NULL);
+
+    p =  OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY);
+    if (p != NULL && !EVP_PKEY_set_params(pStoreCtx->pEVPPkey, params)) {
+        goto cleanup;
+    }
+    return 1;
+
+cleanup:
+    return 0;
 }
 
 static const OSSL_PARAM *sss_ec_keymgmt_gettable_params(void *provctx)
@@ -221,6 +269,11 @@ static const OSSL_PARAM *sss_ec_keymgmt_gettable_params(void *provctx)
 
     (void)(provctx);
     return gettable;
+}
+
+static const OSSL_PARAM *sss_ec_keymgmt_settable_params(void *provctx)
+{
+    return ec_settable_params;
 }
 
 static const char *sss_ec_keymgmt_query_operation_name(int operation_id)
@@ -462,7 +515,7 @@ static int sss_keymgmt_ec_gen_set_params(void *keydata, const OSSL_PARAM params[
     }
     else {
         strtol_ret = strtol(keyId_str, NULL, 0);
-        if ((strtol_ret > 0) && (strtol_ret < UINT32_MAX)) {
+        if ((strtol_ret > 0) && ((uint32_t)strtol_ret < UINT32_MAX)) {
             pStoreCtx->keyid = strtol_ret;
         }
         else {
@@ -501,6 +554,11 @@ static void *sss_keymgmt_ec_gen(void *keydata, OSSL_CALLBACK *osslcb, void *cbar
     int keyLen                          = 0;
     sss_provider_context_t *sssProvCtx  = (sss_provider_context_t *)pStoreCtx->pProvCtx;
     sss_provider_store_obj_t *tmp       = (sss_provider_store_obj_t *)sssProvCtx->pKeyGen;
+    uint8_t publicKey[521] = {0};
+    size_t publicKeyLen    = sizeof(publicKey);
+    size_t publicKeyBitLen = sizeof(publicKey) * 8;
+    EVP_PKEY *pKey = NULL;
+    BIO *bio = NULL;
 
     sssProv_Print(LOG_DBG_ON, "Enter - %s \n", __FUNCTION__);
 
@@ -509,12 +567,6 @@ static void *sss_keymgmt_ec_gen(void *keydata, OSSL_CALLBACK *osslcb, void *cbar
 
     ENSURE_OR_GO_CLEANUP(pStoreCtx != NULL);
     ENSURE_OR_GO_CLEANUP(tmp != NULL);
-
-    if (pStoreCtx->object.cipherType == kSSS_CipherType_NONE) {
-        /* Copy the data*/
-        memcpy(pStoreCtx, tmp, sizeof(sss_provider_store_obj_t));
-        return keydata;
-    }
 
     cipherType = pStoreCtx->object.cipherType;
 
@@ -547,9 +599,33 @@ static void *sss_keymgmt_ec_gen(void *keydata, OSSL_CALLBACK *osslcb, void *cbar
     status = sss_key_store_generate_key(&pStoreCtx->pProvCtx->p_ex_sss_boot_ctx->ks, &pStoreCtx->object, keyLen, NULL);
     ENSURE_OR_GO_CLEANUP(status == kStatus_SSS_Success);
 
-    return keydata;
+    status                 = sss_key_store_get_key(&pStoreCtx->pProvCtx->p_ex_sss_boot_ctx->ks, &pStoreCtx->object, publicKey, &publicKeyLen, &publicKeyBitLen);
+    ENSURE_OR_GO_CLEANUP(status == kStatus_SSS_Success);
+
+    bio = BIO_new_mem_buf(publicKey, (int)publicKeyLen);
+    if (bio == NULL) {
+        LOG_E("Unable to initialize BIO");
+        status = kStatus_SSS_Fail;
+        goto cleanup;
+    }
+
+    pKey = d2i_PUBKEY_bio(bio, NULL);
+    if (!pKey) {
+        LOG_E("Failed to load public key");
+        status = kStatus_SSS_Fail;
+        goto cleanup;
+    }
+
+    pStoreCtx->pEVPPkey = pKey;
+
 cleanup:
-    return NULL;
+    if (bio != NULL) {
+        BIO_free(bio);
+    }
+    if (status == kStatus_SSS_Fail) {
+        return NULL;
+    }
+    return keydata;
 }
 
 static void sss_keymgmt_gen_cleanup(void *keydata)
@@ -559,10 +635,27 @@ static void sss_keymgmt_gen_cleanup(void *keydata)
     return;
 }
 
+static int sss_ec_keymgmt_gen_set_template(void *genctx, void *keydata)
+{
+    sss_provider_store_obj_t *pStoreCtx = (sss_provider_store_obj_t *)keydata;
+    sss_provider_store_obj_t *gStoreCtx = (sss_provider_store_obj_t *)genctx;
+    sssProv_Print(LOG_DBG_ON, "Enter - %s \n", __FUNCTION__);
+
+    gStoreCtx->object       = pStoreCtx->object;
+    gStoreCtx->keyid        = pStoreCtx->keyid;
+    gStoreCtx->key_len      = pStoreCtx->key_len;
+    genctx                  = gStoreCtx;
+
+    return 1;
+}
+
 const OSSL_DISPATCH sss_ec_keymgmt_functions[] = {{OSSL_FUNC_KEYMGMT_LOAD, (void (*)(void))sss_ec_keymgmt_load},
     {OSSL_FUNC_KEYMGMT_FREE, (void (*)(void))sss_ec_keymgmt_free},
     {OSSL_FUNC_KEYMGMT_GET_PARAMS, (void (*)(void))sss_ec_keymgmt_get_params},
+    {OSSL_FUNC_KEYMGMT_GEN_SET_TEMPLATE, (void (*)(void))sss_ec_keymgmt_gen_set_template},
+    {OSSL_FUNC_KEYMGMT_SET_PARAMS, (void (*)(void))sss_ec_keymgmt_set_params},
     {OSSL_FUNC_KEYMGMT_GETTABLE_PARAMS, (void (*)(void))sss_ec_keymgmt_gettable_params},
+    {OSSL_FUNC_KEYMGMT_SETTABLE_PARAMS, (void (*) (void))sss_ec_keymgmt_settable_params},
     {OSSL_FUNC_KEYMGMT_QUERY_OPERATION_NAME, (void (*)(void))sss_ec_keymgmt_query_operation_name},
     {OSSL_FUNC_KEYMGMT_HAS, (void (*)(void))sss_ec_keymgmt_has},
     {OSSL_FUNC_KEYMGMT_EXPORT, (void (*)(void))sss_ec_keymgmt_export},

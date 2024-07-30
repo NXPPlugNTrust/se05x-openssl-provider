@@ -4,7 +4,7 @@
  * @version 1.0
  * @par License
  *
- * Copyright 2022 NXP
+ * Copyright 2022,2024 NXP
  * SPDX-License-Identifier: Apache-2.0
  *
  * @par Description
@@ -618,6 +618,9 @@ cleanup:
         if (pRsaCtx->digestCtx.session != NULL) {
             sss_digest_context_free(&pRsaCtx->digestCtx);
         }
+    }
+    if (digestCtx.session != NULL) {
+        sss_digest_context_free(&digestCtx);
     }
     if (evpCtx != NULL) {
         EVP_PKEY_CTX_free(evpCtx);

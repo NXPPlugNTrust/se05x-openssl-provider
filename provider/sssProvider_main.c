@@ -17,6 +17,12 @@
  * - ECC sign
  * - ECC verify
  * - ECDH compute_key
+ * - ECC CSR
+ * - RSA sign
+ * - RSA verify
+ * - RSA encrypt
+ * - RSA decrypt
+ * - RSA CSR
  */
 
 /* ********************** Include files ********************** */
@@ -32,7 +38,7 @@
 
 /* ********************** Constants ************************** */
 #define SSS_PROVIDER_NAME "NXP Provider"
-#define SSS_PROVIDER_VERSION "1.0.2"
+#define SSS_PROVIDER_VERSION "1.0.3"
 #define SSSPROV_MAX_PRINT_BUF_SIZE (511)
 
 /* ********************** Global variables ************************** */
@@ -81,6 +87,8 @@ static int sss_get_params(void *provctx, OSSL_PARAM params[])
 
     return 1;
 }
+
+extern int sss_get_capabilities(const OSSL_PROVIDER *prov, const char *capability, OSSL_CALLBACK *cb, void *arg);
 
 extern const OSSL_DISPATCH sss_rand_functions[];
 static const OSSL_ALGORITHM sss_rands[] = {{"CTR-DRBG", "provider=nxp_prov", sss_rand_functions}, {NULL, NULL, NULL}};
@@ -180,6 +188,7 @@ static const OSSL_DISPATCH sss_dispatch_table[] = {
     {OSSL_FUNC_PROVIDER_TEARDOWN, (void (*)(void))sss_teardown},
     {OSSL_FUNC_PROVIDER_GETTABLE_PARAMS, (void (*)(void))sss_gettable_params},
     {OSSL_FUNC_PROVIDER_GET_PARAMS, (void (*)(void))sss_get_params},
+    {OSSL_FUNC_PROVIDER_GET_CAPABILITIES, (void (*)(void)) sss_get_capabilities},
     {0, NULL}};
 
 OPENSSL_EXPORT int OSSL_provider_init(

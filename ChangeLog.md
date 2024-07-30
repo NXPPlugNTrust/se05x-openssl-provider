@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.0.3]
+
+- ECC and RSA TLS use case extended for reference keys in file format also.
+
+
 ## [1.0.2]
 
 - TLS support extended for RSA keys.

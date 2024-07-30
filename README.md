@@ -56,7 +56,20 @@ Above commands will build the OpenSSL provider and copy in ``se05x-openssl-provi
 Refer ``CMAKE Options section`` in ``simw_lib\README.rst`` to build OpenSSL provider with different session authentication.
 
 
-`` Note: It is recommended to use access manager to establish PlatformSCP03 session to secure element.``
+```console
+NOTE: It is recommended to use access manager to establish PlatformSCP03 session to secure element.
+
+To establish platformSCP03 from sss provider, we have to load the default provider (required for crypto operations of SCP03) during sss provider initialisation code.
+Uncomment the below code in `sssProvider_main.c`.
+
+    //Load default provider to use random generation during SCP03 connection
+    //if (NULL == OSSL_PROVIDER_load(NULL, "default")) {
+    //    sssProv_Print(LOG_FLOW_ON, "error in OSSL_PROVIDER_load \n");
+    //}
+
+However, this will make the default provider with high priority and operations like key generation and referencing secure element with file based reference keys will not work.
+
+```
 
 
 ## Testing OpenSSL Provider
@@ -77,7 +90,7 @@ openssl ecparam --provider /usr/local/lib/libsssProvider.so --provider default -
 
 ``NOTE: If the key id is not appended to the curve name key will be created at location 0xEF000001 by overwriting (delete key and create new key) it.``
 
-The above command will generate the key in secure element and the output ``(se05x_prime256v1_ref.pem)`` is the reference to the key location of secure element. Refer [Reference key](#reference-keys) section for more details.
+The above command will generate the key in secure element and the output ``(se05x_prime256v1_ref.pem)`` is the reference to the key location of secure element. Refer [Referencing keys in the secure element](#Referencing-keys-in-the-secure-element) section for more details.
 
 The reference key can also be used to perform further crypto operation with secure element.
 
@@ -143,7 +156,7 @@ openssl genrsa --provider /usr/local/lib/libsssProvider.so --provider default -o
 
 ```
 
-The above command will generate the key in secure element at location 0xEF000011 and the output ``(se05x_rsa2048_ref.pem)`` is the reference to the key location of secure element. Refer [Reference key](#reference-keys) section for more details.
+The above command will generate the key in secure element at location 0xEF000011 and the output ``(se05x_rsa2048_ref.pem)`` is the reference to the key location of secure element. Refer [Referencing keys in the secure element](#Referencing-keys-in-the-secure-element) section for more details.
 
 ``NOTE: Key id cannot be passed via command line. Every time the generate key command will overwrite the RSA key created at location 0xEF000011``
 
@@ -192,7 +205,15 @@ openssl x509 -req --provider /usr/local/lib/libsssProvider.so --provider default
 ```
 
 
-## Reference Keys
+## Referencing keys in the secure element
+
+The keys created inside secure element can be referenced in 3 different ways
+
+1. Reference Keys in file format
+2. Labels with reference key. Example - nxp:"path to reference key file"
+3. Labels with key id. Example - nxp:0x12345678
+
+### 1. Reference Keys in file format
 
 The cryptographic functionality offered by the OpenSSL provider requires a reference to a key stored inside the secure element (exception is random generation).
 
@@ -202,8 +223,10 @@ The solution is to populate the OpenSSL Key data structure with only a reference
 
 OpenSSL crypto APIs are then invoked with these data structure objects as parameters. When the crypto API is routed to the provider, the Se05x OpenSSL provider implementation decodes these key references and invokes the secure element APIs with correct key references for a cryptographic operation. If the input key is not a reference key, execution will roll back to OpenSSL software implementation.
 
+``NOTE: When using this method, the sss provider has to be loaded first. This will ensure that the sss provider can decode the key id information present in the reference key.``
 
-### EC Reference Key Format
+
+#### EC Reference Key Format
 
 The following provides an example of an EC reference key. The value reserved
 for the private key has been used to contain:
@@ -240,7 +263,7 @@ ASN1 OID: prime256v1
   matching the stored key.
 ---
 
-### RSA Reference Key Format
+#### RSA Reference Key Format
 
 The following provides an example of an RSA reference key.
 
@@ -283,6 +306,22 @@ The following provides an example of an RSA reference key.
 - Setting prime1 to '1' makes it impossible that a normal private key
   matches a reference key.
 ---
+
+### 2. Labels with reference key.
+
+In this method, the reference key file (described in previous section) with full path can be passed in string format with "nxp:" as prefix.
+Example - nxp:"path to reference key file".
+
+``NOTE: When using this approach, there is no need to load the sss provider first. Default provider can have the higher priority.``
+
+
+### 3. Labels with key id.
+
+In this method, the 4 byte key id of the Key created / stored in secure element is passed as is in string format with "nxp:" as prefix.
+Example - nxp:0x12345678
+
+``NOTE: When using this approach, there is no need to load the sss provider first. Default provider can have the higher priority.``
+
 
 
 ## Example Scripts for OpenSSL Provider
@@ -351,11 +390,11 @@ openssl req -x509 -new -nodes -key tls_rootca_key.pem -subj /OU="NXP Plug Trust 
 
 
 # Create client key inside secure element
-openssl ecparam --provider /usr/local/lib/libsssProvider.so --provider default -name prime256v1:0xEF000001 -genkey -out tls_client_key_ref_0xEF000001.pem
+openssl ecparam --provider /usr/local/lib/libsssProvider.so --provider default -name prime256v1:0xEF000002 -genkey -out tls_client_key_ref_0xEF000002.pem
 
 
 # Create Client key CSR. Use the provider to access the client key created in the previous file.
-openssl req --provider /usr/local/lib/libsssProvider.so --provider default -new -key tls_client_key_ref_0xEF000001.pem -subj "/CN=NXP_SE050_TLS_CLIENT_ECC" -out tls_client.csr
+openssl req --provider /usr/local/lib/libsssProvider.so --provider default -new -key tls_client_key_ref_0xEF000002.pem -subj "/CN=NXP_SE050_TLS_CLIENT_ECC" -out tls_client.csr
 
 
 # Create Client certificate
@@ -378,10 +417,8 @@ openssl s_server -accept 8080 -no_ssl3 -named_curve prime256v1  -CAfile tls_root
 Run Client as
 
 ```console
-openssl s_client --provider default --provider /usr/local/lib/libsssProvider.so -connect 127.0.0.1:8080 -tls1_2 -CAfile tls_rootca.cer -cert tls_client.cer -key nxp:tls_client_key_ref_0xEF000001.pem -cipher ECDHE-ECDSA-AES128-SHA256 -state -msg
+openssl s_client --provider default --provider /usr/local/lib/libsssProvider.so -connect 127.0.0.1:8080 -tls1_2 -CAfile tls_rootca.cer -cert tls_client.cer -key nxp:tls_client_key_ref_0xEF000002.pem -cipher ECDHE-ECDSA-AES128-SHA256 -state -msg
 ```
-
-`` Note: TLS with NXP Provider will only work when the reference key is passed with the "nxp:" prefix.``
 
 ### TLS client example using RSA keys
 
@@ -389,12 +426,12 @@ Create client and server credentials as shown below
 
 ```console
 # Create Root CA key pair and certificate
-openssl genrsa -out tls_rootca_key.pem 1024
+openssl genrsa -out tls_rootca_key.pem 2048
 openssl req -x509 -new -nodes -key tls_rootca_key.pem -subj "/OU=NXP Plug Trust CA/CN=NXP RootCAvExxx" -days 4380 -out tls_rootca.cer
 
 
 # Create client key inside secure element
-openssl genrsa --provider /usr/local/lib/libsssProvider.so --provider default -out tls_client_key_ref_0xEF000011.pem 1024
+openssl genrsa --provider /usr/local/lib/libsssProvider.so --provider default -out tls_client_key_ref_0xEF000011.pem 2048
 
 # Create Client key CSR. Use the provider to access the client key created in the previous file.
 openssl req -new --provider /usr/local/lib/libsssProvider.so --provider default -key tls_client_key_ref_0xEF000011.pem -subj "/CN=NXP_SE050_TLS_CLIENT_RSA" -out tls_client.csr
@@ -404,7 +441,7 @@ openssl x509 -req --provider default -in tls_client.csr -CAcreateserial -out tls
 
 
 # Create Server key pair and certificate
-openssl genrsa -out tls_server_key.pem 1024
+openssl genrsa -out tls_server_key.pem 2048
 openssl req -new -key tls_server_key.pem -subj "/CN=NXP_SE050_TLS_SERVER_RSA" -out tls_server.csr
 openssl x509 -req -sha256 -days 4380 -in tls_server.csr -CAcreateserial -CA tls_rootca.cer -CAkey tls_rootca_key.pem -out tls_server.cer
 
@@ -419,5 +456,5 @@ openssl s_server -accept 8080 -no_ssl3 -CAfile tls_rootca.cer -cert tls_server.c
 Run Client as
 
 ```console
-openssl s_client --provider default --provider /usr/local/lib/libsssProvider.so -connect 127.0.0.1:8080 -tls1_2 -CAfile tls_rootca.cer -cert tls_client.cer -key nxp:tls_client_key_ref_0xEF000011.pem -state -msg
+openssl s_client --provider /usr/local/lib/libsssProvider.so --provider default -connect 127.0.0.1:8080 -tls1_2 -CAfile tls_rootca.cer -cert tls_client.cer -key tls_client_key_ref_0xEF000011.pem -state -msg
 ```
