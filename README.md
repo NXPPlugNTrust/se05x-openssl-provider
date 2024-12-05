@@ -13,6 +13,7 @@ the following functionality can be made available over the OpenSSL provider here
   - ECDH compute key
   - CSR
 - RSA crypto
+  - RSA key generation
   - RSA sign/verify
   - RSA encrypt/decrypt
   - CSR
@@ -90,8 +91,6 @@ openssl ecparam --provider /usr/local/lib/libsssProvider.so --provider default -
 
 ```
 
-``NOTE: If the key id is not appended to the curve name key will be created at location 0xEF000001 by overwriting (delete key and create new key) it.``
-
 The above command will generate the key in secure element and the output ``(se05x_prime256v1_ref.pem)`` is the reference to the key location of secure element. Refer [Referencing keys in the secure element](#Referencing-keys-in-the-secure-element) section for more details.
 
 The reference key can also be used to perform further crypto operation with secure element.
@@ -113,6 +112,7 @@ Supported curves
   - brainpoolP320r1
   - brainpoolP384r1
 
+Note: Key generation on secure element using nxp provider can be done only by loading nxp provider with highest priority.
 
 ### ECDSA - Sign Operation
 
@@ -120,6 +120,15 @@ Supported curves
 openssl pkeyutl --provider /usr/local/lib/libsssProvider.so --provider default -inkey nxp:0xEF000000 -sign -rawin -in input.txt -out signature.txt -digest sha256
 
 ```
+
+In case the default provider is loaded first, ensure to pass the correct property query. Example -
+
+```console
+openssl pkeyutl --provider default --provider /usr/local/lib/libsssProvider.so -inkey nxp:0xEF000000 -sign -rawin -in input.txt -out signature.txt -digest sha256 -propquery "?nxp_prov.signature.ecdsa=yes"
+
+```
+
+Refer - 'OSSL Algorithms property definitions' section for more details.
 
 
 ### ECDSA - Verify Operation
@@ -160,7 +169,9 @@ openssl genrsa --provider /usr/local/lib/libsssProvider.so --provider default -o
 
 The above command will generate the key in secure element at location 0xEF000011 and the output ``(se05x_rsa2048_ref.pem)`` is the reference to the key location of secure element. Refer [Referencing keys in the secure element](#Referencing-keys-in-the-secure-element) section for more details.
 
-``NOTE: Key id cannot be passed via command line. Every time the generate key command will overwrite the RSA key created at location 0xEF000011. (the key id can be changed in file sssProvider_key_mgmt_rsa.c (SSS_DEFAULT_RSA_KEY_ID))``
+``NOTE:
+1. Key id can be passed from application using 'OSSL_PKEY_PARAM_RSA_FACTOR2' parameter as uint32.
+2. Key id cannot be passed via command line. Every time the genrsa command will overwrite the RSA key created at location 0xEF000011. (the key id can be changed in file sssProvider_key_mgmt_rsa.c (SSS_DEFAULT_RSA_KEY_ID))``
 
 Supported RSA bits - 1024, 2048, 3072, 4096
 
@@ -301,7 +312,7 @@ The following provides an example of an RSA reference key.
  ```
 
 ---
-- Ensure keylength, the value reserved for (private key) modulus and
+- Ensure key length, the value reserved for (private key) modulus and
   public exponent match the stored key.
 - The mathematical relation between the different key components is not
   preserved.
@@ -323,6 +334,33 @@ In this method, the 4 byte key id of the Key created / stored in secure element 
 Example - nxp:0x12345678
 
 ``NOTE: When using this approach, there is no need to load the sss provider first. Default provider can have the higher priority.``
+
+
+## OSSL Algorithms property definitions
+
+Following properties definitions are added in nxp provider,
+
+  - Random number generation - `nxp_prov.rand=yes`
+
+  - Key management - `nxp_prov.keymgmt=yes` (Required to offload the ECC / RSA keys operations to nxp provider when the keys are stored in SE05x Secure element).
+    - For ECC - `nxp_prov.keymgmt.ec=yes`
+    - For RSA - `nxp_prov.keymgmt.rsa=yes`
+
+  - Signature - `nxp_prov.signature=yes`  (Required to offload the ECC / RSA Sign / Verify operations to nxp provider when the keys are stored in SE05x Secure element).
+    - For ECDSA - `nxp_prov.signature.ecdsa=yes`
+    - For RSA - `nxp_prov.signature.rsa=yes`
+
+  - Asymmetric Cipher - `nxp_prov.asym_cipher=yes`  (Required to offload the RSA Encrypt / Decrypt to nxp provider when the keys are stored in SE05x Secure element).
+
+  - ECDH - `nxp_prov.keyexch=yes` (Required only when the ephemeral keys are generated on SE05x).
+
+  - Key Store - `nxp_prov.store=yes`  (Required when the keys are referenced using label (nxp:) or reference keys).
+    - For keys passed with nxp: prefix - `nxp_prov.store.nxp=yes`
+    - For keys passed with reference key format - `nxp_prov.store.file=yes`
+
+
+IMPORTANT: 'fips=yes' algorithm property is added for all algorithms supported in nxp provider.
+This is to support the FIPS certified SE05X secure element family.
 
 
 
@@ -378,7 +416,7 @@ The public keys associated with the respective key pairs are contained in respec
 
 The CA is a self-signed certificate. The same CA is used to sign client and server certificate.
 
-### TLS client example using EC keys
+### TLS1.2 / TLS1.3 client example using EC keys
 
 Create client and server credentials as shown below
 
@@ -420,9 +458,13 @@ Run Client as
 
 ```console
 openssl s_client --provider /usr/local/lib/libsssProvider.so --provider default -connect 127.0.0.1:8080 -tls1_2 -CAfile tls_rootca.cer -cert tls_client.cer -key tls_client_key_ref_0xEF000002.pem -cipher ECDHE-ECDSA-AES128-SHA256 -state -msg
+
+OR
+
+openssl s_client --provider /usr/local/lib/libsssProvider.so --provider default -connect 127.0.0.1:8080 -tls1_3 -CAfile tls_rootca.cer -cert tls_client.cer -key tls_client_key_ref_0xEF000002.pem -state -msg
 ```
 
-### TLS client example using RSA keys
+### TLS1.2 / TLS1.3 client example using RSA keys
 
 Create client and server credentials as shown below
 
@@ -459,4 +501,46 @@ Run Client as
 
 ```console
 openssl s_client --provider /usr/local/lib/libsssProvider.so --provider default -connect 127.0.0.1:8080 -tls1_2 -CAfile tls_rootca.cer -cert tls_client.cer -key tls_client_key_ref_0xEF000011.pem -state -msg
+
+OR
+
+openssl s_client --provider /usr/local/lib/libsssProvider.so --provider default -connect 127.0.0.1:8080 -tls1_3 -CAfile tls_rootca.cer -cert tls_client.cer -key tls_client_key_ref_0xEF000011.pem -state -msg
 ```
+
+
+## OpenSSL Configuration file
+
+The provider can be loaded via OpenSSL configuration file also.
+Changes required in configuration file to load provider is shown below,
+
+```console
+...
+
+openssl_conf = openssl_init
+config_diagnostics = 1
+
+[openssl_init]
+providers = provider_sect
+
+[provider_sect]
+nxp_prov = nxp_sect
+default = default_sect
+
+[nxp_sect]
+identity = nxp_prov
+module = <provider lib path>
+activate = 1
+
+[default_sect]
+activate = 1
+
+...
+```
+
+The order in which the providers are written in [provider_sect] section, defines the priority of the providers loaded.
+The one included first, will have the higher priority.
+
+
+``NOTE: It is not recommended to modify the default OpenSSL config file. Create a new config file to load custom providers and set the OPENSSL_CONF env variable to config file path. Example -
+  export OPENSSSL_CONF=<CONFIG_FILE_PATH>
+``

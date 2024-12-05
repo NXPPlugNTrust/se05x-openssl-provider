@@ -20,10 +20,10 @@
 
 #if SSS_HAVE_RSA
 /* ********************** Include files ********************** */
-#include <string.h>
-#include <openssl/core_names.h>
 #include "sssProvider_main.h"
+#include <openssl/core_names.h>
 #include <openssl/rsa.h>
+#include <string.h>
 
 /* ********************** structure definition *************** */
 typedef struct
@@ -75,6 +75,7 @@ static int sss_rsa_enc_encrypt(
     int maxSize          = 0;
 
     sssProv_Print(LOG_DBG_ON, "Enter - %s \n", __FUNCTION__);
+    (void)(outsize);
 
     ENSURE_OR_GO_CLEANUP(pRsaCtx != NULL);
     ENSURE_OR_GO_CLEANUP(pRsaCtx->pStoreObjCtx != NULL);
@@ -120,10 +121,11 @@ static int sss_rsa_enc_encrypt(
         }
         else {
             int openssl_ret = 0;
-            int padding = 0;
+            int padding     = 0;
 
-            sssProv_Print(
-                LOG_FLOW_ON, "Not a key in secure element. Performing RSA Encrypt operation using host software \n");
+            sssProv_Print(LOG_FLOW_ON,
+                "Not a key in secure element. Performing RSA "
+                "Encrypt operation using host software \n");
 
             switch (pRsaCtx->enc_algorithm) {
             case kAlgorithm_SSS_RSAES_PKCS1_V1_5:
@@ -136,7 +138,7 @@ static int sss_rsa_enc_encrypt(
                 sssProv_Print(LOG_ERR_ON, "Padding not supported ! \n");
             }
 
-            evpCtx = EVP_PKEY_CTX_new(pRsaCtx->pStoreObjCtx->pEVPPkey, NULL);
+            evpCtx = EVP_PKEY_CTX_new_from_pkey(NULL, pRsaCtx->pStoreObjCtx->pEVPPkey, "provider!=nxp_prov");
             ENSURE_OR_GO_CLEANUP(evpCtx != NULL);
 
             openssl_ret = EVP_PKEY_encrypt_init(evpCtx);
@@ -193,6 +195,8 @@ static int sss_rsa_enc_decrypt(
 
     sssProv_Print(LOG_DBG_ON, "Enter - %s \n", __FUNCTION__);
 
+    (void)(outsize);
+
     ENSURE_OR_GO_CLEANUP(pRsaCtx != NULL);
     ENSURE_OR_GO_CLEANUP(pRsaCtx->pStoreObjCtx != NULL);
     ENSURE_OR_GO_CLEANUP(outlen != NULL);
@@ -237,10 +241,11 @@ static int sss_rsa_enc_decrypt(
         }
         else {
             int openssl_ret = 0;
-            int padding = 0;
+            int padding     = 0;
 
-            sssProv_Print(
-                LOG_FLOW_ON, "Not a key in secure element. Performing RSA Decrypt operation using host software \n");
+            sssProv_Print(LOG_FLOW_ON,
+                "Not a key in secure element. Performing RSA "
+                "Decrypt operation using host software \n");
 
             switch (pRsaCtx->enc_algorithm) {
             case kAlgorithm_SSS_RSAES_PKCS1_V1_5:
@@ -253,7 +258,7 @@ static int sss_rsa_enc_decrypt(
                 sssProv_Print(LOG_ERR_ON, "Padding not supported ! \n");
             }
 
-            evpCtx = EVP_PKEY_CTX_new(pRsaCtx->pStoreObjCtx->pEVPPkey, NULL);
+            evpCtx = EVP_PKEY_CTX_new_from_pkey(NULL, pRsaCtx->pStoreObjCtx->pEVPPkey, "provider!=nxp_prov");
             ENSURE_OR_GO_CLEANUP(evpCtx != NULL);
 
             openssl_ret = EVP_PKEY_decrypt_init(evpCtx);
@@ -331,11 +336,21 @@ static int sss_rsa_enc_set_ctx_params(void *ctx, const OSSL_PARAM params[])
     p = OSSL_PARAM_locate_const(params, OSSL_ASYM_CIPHER_PARAM_PAD_MODE);
     if (p != NULL) {
         switch (p->data_type) {
-        case OSSL_PARAM_INTEGER:
+        case OSSL_PARAM_INTEGER: {
             if (!OSSL_PARAM_get_int(p, &pad_mode)) {
                 return 0;
             }
-            break;
+            if (pad_mode == RSA_PKCS1_PADDING) {
+                pRsaCtx->enc_algorithm = kAlgorithm_SSS_RSAES_PKCS1_V1_5;
+            }
+            else if (pad_mode == RSA_PKCS1_OAEP_PADDING) {
+                pRsaCtx->enc_algorithm = kAlgorithm_SSS_RSAES_PKCS1_OAEP_SHA1;
+            }
+            else {
+                sssProv_Print(LOG_ERR_ON, "Padding not supported ! \n");
+                return 0;
+            }
+        } break;
         case OSSL_PARAM_UTF8_STRING: {
             if (p->data == NULL) {
                 return 0;
@@ -368,6 +383,8 @@ static const OSSL_PARAM *sss_rsa_enc_settable_ctx_params(void *ctx, void *provct
         OSSL_PARAM_END};
 
     sssProv_Print(LOG_DBG_ON, "Enter - %s \n", __FUNCTION__);
+    (void)(ctx);
+    (void)(provctx);
     return known_settable_ctx_params;
 }
 

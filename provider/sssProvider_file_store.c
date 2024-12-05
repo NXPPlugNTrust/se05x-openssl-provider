@@ -8,16 +8,18 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * @par Description
- * OpenSSL Provider implementation for file store to decode reference keys or openssl keys
+ * OpenSSL Provider implementation for file store to decode reference keys or
+ * openssl keys
  *
  */
 
 /* ********************** Include files ********************** */
+#include "sssProvider_main.h"
+#include <limits.h>
 #include <openssl/core_names.h>
 #include <openssl/core_object.h>
 #include <openssl/pem.h>
-#include "sssProvider_main.h"
-#include <limits.h>
+#include <openssl/store.h>
 
 /* ********************** Public funtions ******************* */
 
@@ -110,7 +112,7 @@ int sss_handle_ecc_ref_key(sss_provider_store_obj_t *pStoreCtx, EVP_PKEY *pEVPKe
     }
 #endif
 
-    if(pStoreCtx->isFile) {
+    if (pStoreCtx->isEVPKey) {
         ENSURE_OR_GO_CLEANUP(pStoreCtx->pProvCtx != NULL);
         ENSURE_OR_GO_CLEANUP(pStoreCtx->pProvCtx->p_ex_sss_boot_ctx != NULL);
 
@@ -121,12 +123,11 @@ int sss_handle_ecc_ref_key(sss_provider_store_obj_t *pStoreCtx, EVP_PKEY *pEVPKe
         ENSURE_OR_GO_CLEANUP(status == kStatus_SSS_Success);
     }
 
-    pStoreCtx->isFile = 0;
-    ret = 0;
+    pStoreCtx->isEVPKey = 0;
+    ret                 = 0;
 cleanup:
     return ret;
 }
-
 
 int sss_handle_rsa_ref_key(sss_provider_store_obj_t *pStoreCtx, EVP_PKEY *pEVPKey)
 {
@@ -154,7 +155,7 @@ int sss_handle_rsa_ref_key(sss_provider_store_obj_t *pStoreCtx, EVP_PKEY *pEVPKe
     ENSURE_OR_GO_CLEANUP(keyid <= UINT32_MAX);
     pStoreCtx->keyid = keyid;
 
-    if(pStoreCtx->isFile){
+    if (pStoreCtx->isEVPKey) {
         ENSURE_OR_GO_CLEANUP(pStoreCtx->pProvCtx != NULL);
         ENSURE_OR_GO_CLEANUP(pStoreCtx->pProvCtx->p_ex_sss_boot_ctx != NULL);
 
@@ -165,12 +166,11 @@ int sss_handle_rsa_ref_key(sss_provider_store_obj_t *pStoreCtx, EVP_PKEY *pEVPKe
         ENSURE_OR_GO_CLEANUP(status == kStatus_SSS_Success);
     }
 
-    pStoreCtx->isFile = 0;
-    ret = 0;
+    pStoreCtx->isEVPKey = 0;
+    ret                 = 0;
 cleanup:
     return ret;
 }
-
 
 /* ********************** Private funtions ******************* */
 
@@ -188,7 +188,12 @@ static void *sss_file_store_object_open(void *provctx, const char *uri)
         return NULL;
     }
 
-    pStoreCtx->isFile   = 1;
+    /*
+  Set it to 1.
+  We do not know yet if the file is reference key or actual key
+  */
+    pStoreCtx->isEVPKey = 1;
+
     pStoreCtx->pProvCtx = provctx;
 
     // Opening the pem file
@@ -215,6 +220,10 @@ static int sss_file_store_object_load(
     unsigned char *buffer  = NULL;
     unsigned char *pbuffer = NULL;
     X509 *x509             = NULL;
+    char buf[30]           = {
+        0,
+    };
+    bool isPEM = false;
 
     sssProv_Print(LOG_DBG_ON, "Enter - %s \n", __FUNCTION__);
 
@@ -225,7 +234,22 @@ static int sss_file_store_object_load(
         return 0;
     }
 
-    pEVPKey = PEM_read_PrivateKey(pStoreCtx->pFile, NULL, NULL, NULL);
+    if (pStoreCtx->expected_type == OSSL_STORE_INFO_PARAMS) {
+        pStoreCtx->pFile = NULL;
+        return 0;
+    }
+    ENSURE_OR_GO_EXIT(fgets(buf, sizeof(buf), pStoreCtx->pFile) != NULL);
+    ENSURE_OR_GO_EXIT(fseek(pStoreCtx->pFile, 0, SEEK_SET) == 0);
+    if (strstr(buf, "-----BEGIN") != NULL) {
+        isPEM = true;
+    }
+
+    if (isPEM) {
+        pEVPKey = PEM_read_PrivateKey(pStoreCtx->pFile, NULL, NULL, NULL);
+    }
+    else {
+        pEVPKey = d2i_PrivateKey_fp(pStoreCtx->pFile, NULL);
+    }
     if (pEVPKey) /* Handle private key */
     {
         pStoreCtx->pEVPPkey     = pEVPKey;
@@ -233,7 +257,8 @@ static int sss_file_store_object_load(
 
         if (EVP_PKEY_id(pEVPKey) == EVP_PKEY_EC) {
             keytype = "EC";
-            ret     = sss_handle_ecc_ref_key(pStoreCtx, pEVPKey);
+            /* If reference key, pStoreCtx->isEVPKey is set to 0 in the below call. */
+            ret = sss_handle_ecc_ref_key(pStoreCtx, pEVPKey);
             if (ret != 0) {
                 /* Not a ref key */
                 sssProv_Print(LOG_FLOW_ON, "Not a ref key \n");
@@ -242,7 +267,8 @@ static int sss_file_store_object_load(
         }
         else if (EVP_PKEY_id(pEVPKey) == EVP_PKEY_RSA) {
             keytype = "RSA";
-            ret     = sss_handle_rsa_ref_key(pStoreCtx, pEVPKey);
+            /* If reference key, pStoreCtx->isEVPKey is set to 0 in the below call. */
+            ret = sss_handle_rsa_ref_key(pStoreCtx, pEVPKey);
             if (ret != 0) {
                 /* Not a ref key */
                 sssProv_Print(LOG_FLOW_ON, "Not a ref key \n");
@@ -257,12 +283,17 @@ static int sss_file_store_object_load(
     }
 
     ENSURE_OR_GO_EXIT(fseek(pStoreCtx->pFile, 0, SEEK_SET) == 0);
-    pEVPKey = PEM_read_PUBKEY(pStoreCtx->pFile, NULL, NULL, NULL);
+    if (isPEM) {
+        pEVPKey = PEM_read_PUBKEY(pStoreCtx->pFile, NULL, NULL, NULL);
+    }
+    else {
+        pEVPKey = d2i_PUBKEY_fp(pStoreCtx->pFile, NULL);
+    }
     if (pEVPKey) /* Handle public key */
     {
         pStoreCtx->isPrivateKey = false;
         pStoreCtx->pEVPPkey     = pEVPKey;
-        pStoreCtx->isFile       = 1;
+        pStoreCtx->isEVPKey     = 1;
         if (EVP_PKEY_RSA == EVP_PKEY_id(pStoreCtx->pEVPPkey)) {
             keytype     = "RSA";
             object_type = OSSL_OBJECT_PKEY;
@@ -279,7 +310,12 @@ static int sss_file_store_object_load(
     }
 
     ENSURE_OR_GO_EXIT(fseek(pStoreCtx->pFile, 0L, SEEK_SET) == 0);
-    x509 = PEM_read_X509(pStoreCtx->pFile, &x509, NULL, NULL);
+    if (isPEM) {
+        x509 = PEM_read_X509(pStoreCtx->pFile, &x509, NULL, NULL);
+    }
+    else {
+        x509 = d2i_X509_fp(pStoreCtx->pFile, NULL);
+    }
     if (x509 != NULL) {
         buf_len = i2d_X509(x509, NULL);
         ENSURE_OR_GO_EXIT(buf_len > 0);
@@ -289,7 +325,7 @@ static int sss_file_store_object_load(
         ENSURE_OR_GO_EXIT(i2d_X509(x509, &pbuffer) > 0);
         pStoreCtx->isPrivateKey = false;
         pStoreCtx->pEVPPkey     = NULL;
-        pStoreCtx->isFile       = 1;
+        pStoreCtx->isEVPKey     = 1;
         keytype                 = "CERTIFICATE";
         object_type             = OSSL_OBJECT_CERT;
         params[i++]             = OSSL_PARAM_construct_octet_string(OSSL_OBJECT_PARAM_DATA, (char *)buffer, buf_len);
@@ -316,6 +352,34 @@ exit:
     return ret;
 }
 
+static const OSSL_PARAM *sss_file_settable_ctx_params(void *provctx)
+{
+    (void)(provctx);
+    static const OSSL_PARAM known_settable_ctx_params[] = {
+        OSSL_PARAM_int(OSSL_STORE_PARAM_EXPECT, NULL), OSSL_PARAM_END};
+    return known_settable_ctx_params;
+}
+
+static int sss_file_set_ctx_params(void *provctx, const OSSL_PARAM params[])
+{
+    sss_provider_store_obj_t *pStoreCtx = provctx;
+
+    sssProv_Print(LOG_DBG_ON, "Enter - %s \n", __FUNCTION__);
+
+    const OSSL_PARAM *p;
+
+    if (params == NULL) {
+        return 1;
+    }
+
+    p = OSSL_PARAM_locate_const(params, OSSL_STORE_PARAM_EXPECT);
+    if (p != NULL && !OSSL_PARAM_get_int(p, &pStoreCtx->expected_type)) {
+        return 0;
+    }
+
+    return 1;
+}
+
 static int sss_file_store_object_eof(void *ctx)
 {
     sss_provider_store_obj_t *pStoreCtx = ctx;
@@ -339,10 +403,11 @@ static int sss_file_store_object_close(void *ctx)
     if (pStoreCtx != NULL) {
         if (pStoreCtx->pFile != NULL) {
             if (fclose(pStoreCtx->pFile) < 0) {
-                //return 0;
+                // return 0;
             }
         }
-        if (pStoreCtx->pEVPPkey == NULL) { /* Provider store object with EVP Key are freed in key mgmt APIs */
+        if (pStoreCtx->pEVPPkey == NULL) { /* Provider store object with EVP Key are
+                                          freed in key mgmt APIs */
             OPENSSL_free(pStoreCtx);
         }
     }
@@ -352,6 +417,8 @@ static int sss_file_store_object_close(void *ctx)
 const OSSL_DISPATCH sss_file_store_object_functions[] = {
     {OSSL_FUNC_STORE_OPEN, (void (*)(void))sss_file_store_object_open},
     {OSSL_FUNC_STORE_LOAD, (void (*)(void))sss_file_store_object_load},
+    {OSSL_FUNC_STORE_SETTABLE_CTX_PARAMS, (void (*)(void))sss_file_settable_ctx_params},
+    {OSSL_FUNC_STORE_SET_CTX_PARAMS, (void (*)(void))sss_file_set_ctx_params},
     {OSSL_FUNC_STORE_EOF, (void (*)(void))sss_file_store_object_eof},
     {OSSL_FUNC_STORE_CLOSE, (void (*)(void))sss_file_store_object_close},
     {0, NULL}};

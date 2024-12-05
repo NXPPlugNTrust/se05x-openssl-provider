@@ -1,5 +1,5 @@
 #
-# Copyright 2022 NXP
+# Copyright 2022,2024 NXP
 # SPDX-License-Identifier: Apache-2.0
 #
 import argparse
@@ -20,8 +20,6 @@ def main():
             os.mkdir(output_keys_dir)
 
         sha_types = ["sha1",  "sha224",  "sha256",  "sha384",  "sha512"]
-        sha_type = "sha256"
-
         keyid_label = "nxp:0xEF000003"
         key_type_keyid = key_type+":0xEF000003"
         ref_ec_key_0xEF000003 = output_keys_dir + os.sep + "ecc_ref_key_0xEF000003.pem"
@@ -32,19 +30,48 @@ def main():
         log.info("\n########### Generate EC Keys Using Openssl Provider at 0xEF000003 location ###############")
         run("%s ecparam --provider %s --provider default -name %s -genkey -out %s" %(openssl_bin, provider, key_type_keyid, ref_ec_key_0xEF000003))
 
-        log.info("\nSign using Provider (Using key labels) ")
-        run("%s pkeyutl --provider %s --provider default -inkey %s -sign -rawin -in %s -out %s -digest %s" % (openssl_bin, provider, keyid_label, input_data, signature, sha_type))
-        log.info("###################################################")
-        log.info("\nVerify signature using host  ")
-        run("%s pkeyutl -verify -inkey %s -sigfile %s -in %s -rawin -digest %s"%(openssl_bin, ref_ec_key_0xEF000003, signature, input_data, sha_type))
-        log.info("#################################################### \n")
+        for sha_type in sha_types:
+            log.info("\nSign using Provider (Using key labels) ")
+            run("%s pkeyutl --provider %s --provider default -inkey %s -sign -rawin -in %s -out %s -digest %s" % (openssl_bin, provider, keyid_label, input_data, signature, sha_type))
+            log.info("###################################################")
+            log.info("\nVerify signature using Provider (Using key labels)  ")
+            run("%s pkeyutl --provider %s --provider default  -verify -inkey %s -sigfile %s -in %s -rawin -digest %s"%(openssl_bin, provider, keyid_label, signature, input_data, sha_type))
+            log.info("#################################################### \n")
 
-        log.info("\nSign using Provider (Using reference keys) ")
-        run("%s pkeyutl --provider %s --provider default -inkey nxp:%s -sign -rawin -in %s -out %s -digest %s" % (openssl_bin, provider, ref_ec_key_0xEF000003, input_data, signature, sha_type))
-        log.info("###################################################")
-        log.info("\nVerify signature using host  ")
-        run("%s pkeyutl -verify -inkey %s -sigfile %s -in %s -rawin -digest %s"%(openssl_bin, ref_ec_key_0xEF000003, signature, input_data, sha_type))
-        log.info("#################################################### \n")
+            log.info("\nSign using Provider (Using reference keys) ")
+            run("%s pkeyutl --provider %s --provider default -inkey %s -sign -rawin -in %s -out %s -digest %s" % (openssl_bin, provider, ref_ec_key_0xEF000003, input_data, signature, sha_type))
+            log.info("###################################################")
+            log.info("\nVerify signature using Provider (Using reference keys)  ")
+            run("%s pkeyutl --provider %s --provider default  -verify -inkey %s -sigfile %s -in %s -rawin -digest %s"%(openssl_bin, provider, ref_ec_key_0xEF000003, signature, input_data, sha_type))
+            log.info("#################################################### \n")
+
+            log.info("\nSign using Provider (Using key labels) ")
+            run("%s pkeyutl --provider %s --provider default -inkey %s -sign -rawin -in %s -out %s -digest %s" % (openssl_bin, provider, keyid_label, input_data, signature, sha_type))
+            log.info("###################################################")
+            log.info("\nVerify signature using Provider (Using reference keys)  ")
+            run("%s pkeyutl --provider %s --provider default  -verify -inkey %s -sigfile %s -in %s -rawin -digest %s"%(openssl_bin, provider, ref_ec_key_0xEF000003, signature, input_data, sha_type))
+            log.info("#################################################### \n")
+
+            log.info("\nSign using Provider (Using reference keys) ")
+            run("%s pkeyutl --provider %s --provider default -inkey %s -sign -rawin -in %s -out %s -digest %s" % (openssl_bin, provider, ref_ec_key_0xEF000003, input_data, signature, sha_type))
+            log.info("###################################################")
+            log.info("\nVerify signature using Provider (Using key labels)  ")
+            run("%s pkeyutl --provider %s --provider default  -verify -inkey %s -sigfile %s -in %s -rawin -digest %s"%(openssl_bin, provider, keyid_label, signature, input_data, sha_type))
+            log.info("#################################################### \n")
+
+            log.info("\nSign using Provider (Using key labels) ")
+            run("%s pkeyutl --provider %s --provider default -inkey %s -sign -rawin -in %s -out %s -digest %s" % (openssl_bin, provider, keyid_label, input_data, signature, sha_type))
+            log.info("###################################################")
+            log.info("\nVerify signature using host  ")
+            run("%s pkeyutl -verify -inkey %s -sigfile %s -in %s -rawin -digest %s"%(openssl_bin, ref_ec_key_0xEF000003, signature, input_data, sha_type))
+            log.info("#################################################### \n")
+
+            log.info("\nSign using Provider (Using reference keys) ")
+            run("%s pkeyutl --provider %s --provider default -inkey nxp:%s -sign -rawin -in %s -out %s -digest %s" % (openssl_bin, provider, ref_ec_key_0xEF000003, input_data, signature, sha_type))
+            log.info("###################################################")
+            log.info("\nVerify signature using host  ")
+            run("%s pkeyutl -verify -inkey %s -sigfile %s -in %s -rawin -digest %s"%(openssl_bin, ref_ec_key_0xEF000003, signature, input_data, sha_type))
+            log.info("#################################################### \n")
 
 
     log.info("##############################################################")

@@ -21,9 +21,9 @@
 #if SSS_HAVE_ECC
 
 /* ********************** Include files ********************** */
-#include <string.h>
-#include <openssl/core_names.h>
 #include "sssProvider_main.h"
+#include <openssl/core_names.h>
+#include <string.h>
 
 /* ********************** Constants ************************** */
 #define MAX_DIGEST_INPUT_DATA 512
@@ -158,7 +158,7 @@ static int sss_ecdsa_signature_sign(
         ENSURE_OR_GO_CLEANUP(pEcdsaCtx->pProvCtx->p_ex_sss_boot_ctx != NULL);
 
         if (sig == NULL) {
-            *siglen = (((pEcdsaCtx->pStoreObjCtx->key_len) * 2) + 8);
+            *siglen = (((pEcdsaCtx->pStoreObjCtx->key_len) * 2) + 10);
             return 1;
         }
         else {
@@ -200,10 +200,11 @@ static int sss_ecdsa_signature_sign(
         else {
             int openssl_ret = 0;
 
-            sssProv_Print(
-                LOG_FLOW_ON, "Not a key in secure element. Performing ECDSA sign operation using host software \n");
+            sssProv_Print(LOG_FLOW_ON,
+                "Not a key in secure element. Performing "
+                "ECDSA sign operation using host software \n");
 
-            evpCtx = EVP_PKEY_CTX_new(pEcdsaCtx->pStoreObjCtx->pEVPPkey, NULL /* no engine */);
+            evpCtx = EVP_PKEY_CTX_new_from_pkey(NULL, pEcdsaCtx->pStoreObjCtx->pEVPPkey, "provider!=nxp_prov");
             ENSURE_OR_GO_CLEANUP(evpCtx != NULL);
 
             openssl_ret = EVP_PKEY_sign_init(evpCtx);
@@ -389,7 +390,7 @@ static int sss_ecdsa_signature_digest_sign_final(void *ctx, unsigned char *sig, 
         ENSURE_OR_GO_CLEANUP(pEcdsaCtx->pProvCtx->p_ex_sss_boot_ctx != NULL);
 
         if (sig == NULL) {
-            *siglen = (((pEcdsaCtx->pStoreObjCtx->key_len) * 2) + 8);
+            *siglen = (((pEcdsaCtx->pStoreObjCtx->key_len) * 2) + 10);
             return 1;
         }
         else {
@@ -427,10 +428,11 @@ static int sss_ecdsa_signature_digest_sign_final(void *ctx, unsigned char *sig, 
         else {
             int openssl_ret = 0;
 
-            sssProv_Print(
-                LOG_FLOW_ON, "Not a key in secure element. Performing ECDSA sign operation using host software \n");
+            sssProv_Print(LOG_FLOW_ON,
+                "Not a key in secure element. Performing "
+                "ECDSA sign operation using host software \n");
 
-            evpCtx = EVP_PKEY_CTX_new(pEcdsaCtx->pStoreObjCtx->pEVPPkey, NULL);
+            evpCtx = EVP_PKEY_CTX_new_from_pkey(NULL, pEcdsaCtx->pStoreObjCtx->pEVPPkey, "provider!=nxp_prov");
             ENSURE_OR_GO_CLEANUP(evpCtx != NULL);
 
             openssl_ret = EVP_PKEY_sign_init(evpCtx);
@@ -520,7 +522,7 @@ static int sss_ecdsa_signature_digest_sign(
         ENSURE_OR_GO_CLEANUP(pEcdsaCtx->pProvCtx->p_ex_sss_boot_ctx != NULL);
 
         if (sig == NULL) {
-            *siglen = (((pEcdsaCtx->pStoreObjCtx->key_len) * 2) + 8);
+            *siglen = (((pEcdsaCtx->pStoreObjCtx->key_len) * 2) + 10);
             return 1;
         }
         else {
@@ -537,7 +539,7 @@ static int sss_ecdsa_signature_digest_sign(
 #endif
             ENSURE_OR_GO_CLEANUP(status == kStatus_SSS_Success);
 
-            //performing digest on the input data
+            // performing digest on the input data
             status = sss_digest_init(&digestCtx);
             ENSURE_OR_GO_CLEANUP(status == kStatus_SSS_Success);
 
@@ -589,10 +591,11 @@ static int sss_ecdsa_signature_digest_sign(
         else {
             int openssl_ret = 0;
 
-            sssProv_Print(
-                LOG_FLOW_ON, "Not a key in secure element. Performing ECDSA sign operation using host software \n");
+            sssProv_Print(LOG_FLOW_ON,
+                "Not a key in secure element. Performing "
+                "ECDSA sign operation using host software \n");
 
-            evpCtx = EVP_PKEY_CTX_new(pEcdsaCtx->pStoreObjCtx->pEVPPkey, NULL);
+            evpCtx = EVP_PKEY_CTX_new_from_pkey(NULL, pEcdsaCtx->pStoreObjCtx->pEVPPkey, "provider!=nxp_prov");
             ENSURE_OR_GO_CLEANUP(evpCtx != NULL);
 
             openssl_ret = EVP_PKEY_sign_init(evpCtx);
@@ -720,12 +723,13 @@ static int sss_ecdsa_signature_verify(
 
         int openssl_ret = 0;
 
-        sssProv_Print(
-            LOG_FLOW_ON, "Not a key in secure element. Performing ECDSA verify operation using host software \n");
+        sssProv_Print(LOG_FLOW_ON,
+            "Not a key in secure element. Performing ECDSA "
+            "verify operation using host software \n");
 
         ENSURE_OR_GO_CLEANUP(pEcdsaCtx->pStoreObjCtx->pEVPPkey != NULL);
 
-        evpCtx = EVP_PKEY_CTX_new(pEcdsaCtx->pStoreObjCtx->pEVPPkey, NULL);
+        evpCtx = EVP_PKEY_CTX_new_from_pkey(NULL, pEcdsaCtx->pStoreObjCtx->pEVPPkey, "provider!=nxp_prov");
         ENSURE_OR_GO_CLEANUP(evpCtx != NULL);
 
         openssl_ret = EVP_PKEY_verify_init(evpCtx);
@@ -820,12 +824,13 @@ static int sss_ecdsa_signature_digest_verify_final(void *ctx, const unsigned cha
 
         int openssl_ret = 0;
 
-        sssProv_Print(
-            LOG_FLOW_ON, "Not a key in secure element. Performing ECDSA verify operation using host software \n");
+        sssProv_Print(LOG_FLOW_ON,
+            "Not a key in secure element. Performing ECDSA "
+            "verify operation using host software \n");
 
         ENSURE_OR_GO_CLEANUP(pEcdsaCtx->pStoreObjCtx->pEVPPkey != NULL);
 
-        evpCtx = EVP_PKEY_CTX_new(pEcdsaCtx->pStoreObjCtx->pEVPPkey, NULL);
+        evpCtx = EVP_PKEY_CTX_new_from_pkey(NULL, pEcdsaCtx->pStoreObjCtx->pEVPPkey, "provider!=nxp_prov");
         ENSURE_OR_GO_CLEANUP(evpCtx != NULL);
 
         openssl_ret = EVP_PKEY_verify_init(evpCtx);
@@ -888,16 +893,176 @@ cleanup:
 }
 
 static int sss_ecdsa_signature_digest_verify(
-    void *ctx, unsigned char *sig, size_t *siglen, size_t sigsize, const unsigned char *data, size_t datalen)
+    void *ctx, unsigned char *sig, size_t sigsize, const unsigned char *data, size_t datalen)
 {
-    sssProv_Print(LOG_DBG_ON, "Enter - %s (NOT IMPLEMENTED) \n", __FUNCTION__);
-    (void)(ctx);
-    (void)(sig);
-    (void)(siglen);
-    (void)(sigsize);
-    (void)(data);
-    (void)(datalen);
-    return 0;
+    sss_provider_ecdsa_ctx_st *pEcdsaCtx = (sss_provider_ecdsa_ctx_st *)ctx;
+    int ret                              = 0;
+    sss_status_t status;
+    sss_digest_t digestCtx    = {0};
+    sss_asymmetric_t asymmCtx = {
+        0,
+    };
+    size_t datalenTmp    = datalen;
+    size_t offset        = 0;
+    size_t templen       = 0;
+    EVP_PKEY_CTX *evpCtx = NULL;
+    const EVP_MD *md     = NULL;
+
+    sssProv_Print(LOG_DBG_ON, "Enter - %s \n", __FUNCTION__);
+
+    ENSURE_OR_GO_CLEANUP(data != NULL);
+    ENSURE_OR_GO_CLEANUP(pEcdsaCtx != NULL);
+    ENSURE_OR_GO_CLEANUP(pEcdsaCtx->pStoreObjCtx != NULL);
+    ENSURE_OR_GO_CLEANUP(sig != NULL);
+
+    if (pEcdsaCtx->pStoreObjCtx->object.keyId != 0) {
+        ENSURE_OR_GO_CLEANUP(pEcdsaCtx->pProvCtx != NULL);
+        ENSURE_OR_GO_CLEANUP(pEcdsaCtx->pProvCtx->p_ex_sss_boot_ctx != NULL);
+
+#if SSS_HAVE_HOSTCRYPTO_ANY
+        /* digest context initialization */
+        status = sss_digest_context_init(&digestCtx,
+            &(pEcdsaCtx->pProvCtx->p_ex_sss_boot_ctx->host_session),
+            pEcdsaCtx->sha_algorithm,
+            kMode_SSS_Digest);
+#else
+        /* Digest of the message is always done on host */
+        status = kStatus_SSS_Fail;
+        sssProv_Print(LOG_ERR_ON, "Enable host crypto support");
+#endif
+        ENSURE_OR_GO_CLEANUP(status == kStatus_SSS_Success);
+
+        // performing digest on the input data
+        status = sss_digest_init(&digestCtx);
+        ENSURE_OR_GO_CLEANUP(status == kStatus_SSS_Success);
+
+        while (datalenTmp > 0) {
+            templen = (datalenTmp > MAX_DIGEST_INPUT_DATA) ? MAX_DIGEST_INPUT_DATA : datalenTmp;
+
+            status = sss_digest_update(&digestCtx, data + offset, templen);
+            ENSURE_OR_GO_CLEANUP(status == kStatus_SSS_Success);
+
+            datalenTmp = datalenTmp - templen;
+            ENSURE_OR_GO_CLEANUP((UINT_MAX - offset) >= templen);
+            offset = offset + templen;
+        }
+
+        status = sss_digest_finish(&digestCtx, pEcdsaCtx->digest, &(pEcdsaCtx->digestLen));
+        ENSURE_OR_GO_CLEANUP(status == kStatus_SSS_Success);
+
+        // asymmetric context initialization
+        status = sss_asymmetric_context_init(&asymmCtx,
+            &(pEcdsaCtx->pProvCtx->p_ex_sss_boot_ctx->session),
+            &pEcdsaCtx->pStoreObjCtx->object,
+            pEcdsaCtx->sha_algorithm,
+            kMode_SSS_Verify);
+        ENSURE_OR_GO_CLEANUP(status == kStatus_SSS_Success);
+
+        sssProv_Print(LOG_FLOW_ON, "Performing ECDSA verify using SE05x \n");
+        sssProv_Print(LOG_DBG_ON, "(Using key id 0x%X from SE05x) \n", pEcdsaCtx->pStoreObjCtx->object.keyId);
+        status =
+            sss_asymmetric_verify_digest(&asymmCtx, pEcdsaCtx->digest, pEcdsaCtx->digestLen, (uint8_t *)sig, sigsize);
+        ENSURE_OR_GO_CLEANUP(status == kStatus_SSS_Success);
+
+        ret = 1;
+    }
+    else {
+        /* Roll back to software implementation */
+
+        ENSURE_OR_GO_CLEANUP(pEcdsaCtx->pStoreObjCtx->pEVPPkey != NULL);
+
+        int openssl_ret = 0;
+
+        sssProv_Print(LOG_FLOW_ON,
+            "Not a key in secure element. Performing ECDSA "
+            "verify operation using host software \n");
+
+        evpCtx = EVP_PKEY_CTX_new_from_pkey(NULL, pEcdsaCtx->pStoreObjCtx->pEVPPkey, "provider!=nxp_prov");
+        ENSURE_OR_GO_CLEANUP(evpCtx != NULL);
+
+        openssl_ret = EVP_PKEY_verify_init(evpCtx);
+        ENSURE_OR_GO_CLEANUP(openssl_ret == 1);
+
+        switch (pEcdsaCtx->sha_algorithm) {
+        case kAlgorithm_SSS_SHA1: {
+            md = EVP_sha1();
+            break;
+        }
+        case kAlgorithm_SSS_SHA224: {
+            md = EVP_sha224();
+            break;
+        }
+        case kAlgorithm_SSS_SHA256: {
+            md = EVP_sha256();
+            break;
+        }
+        case kAlgorithm_SSS_SHA384: {
+            md = EVP_sha384();
+            break;
+        }
+        case kAlgorithm_SSS_SHA512: {
+            md = EVP_sha512();
+            break;
+        }
+        default: {
+            md = NULL;
+        }
+        }
+
+#if SSS_HAVE_HOSTCRYPTO_ANY
+        /* digest context initialization */
+        status = sss_digest_context_init(&digestCtx,
+            &(pEcdsaCtx->pProvCtx->p_ex_sss_boot_ctx->host_session),
+            pEcdsaCtx->sha_algorithm,
+            kMode_SSS_Digest);
+#else
+        /* Digest of the message is always done on host */
+        status = kStatus_SSS_Fail;
+        sssProv_Print(LOG_ERR_ON, "Enable host crypto support");
+#endif
+        ENSURE_OR_GO_CLEANUP(status == kStatus_SSS_Success);
+
+        status = sss_digest_init(&digestCtx);
+        ENSURE_OR_GO_CLEANUP(status == kStatus_SSS_Success);
+
+        while (datalenTmp > 0) {
+            templen = (datalenTmp > MAX_DIGEST_INPUT_DATA) ? MAX_DIGEST_INPUT_DATA : datalenTmp;
+
+            status = sss_digest_update(&digestCtx, data + offset, templen);
+            ENSURE_OR_GO_CLEANUP(status == kStatus_SSS_Success);
+
+            datalenTmp = datalenTmp - templen;
+            ENSURE_OR_GO_CLEANUP((UINT_MAX - offset) >= templen);
+            offset = offset + templen;
+        }
+
+        status = sss_digest_finish(&digestCtx, pEcdsaCtx->digest, &(pEcdsaCtx->digestLen));
+        ENSURE_OR_GO_CLEANUP(status == kStatus_SSS_Success);
+
+        openssl_ret = EVP_PKEY_CTX_set_signature_md(evpCtx, md);
+        ENSURE_OR_GO_CLEANUP(openssl_ret == 1);
+
+        openssl_ret = EVP_PKEY_verify(evpCtx, sig, sigsize, pEcdsaCtx->digest, pEcdsaCtx->digestLen);
+        ENSURE_OR_GO_CLEANUP(openssl_ret == 1);
+    }
+    ret = 1;
+cleanup:
+    if (asymmCtx.session != NULL) {
+        sss_asymmetric_context_free(&asymmCtx);
+    }
+    if (digestCtx.session != NULL) {
+        sss_digest_context_free(&digestCtx);
+    }
+    if (pEcdsaCtx != NULL) {
+        if (pEcdsaCtx->digestCtx.session != NULL) {
+            sss_digest_context_free(&pEcdsaCtx->digestCtx);
+        }
+    }
+    if (evpCtx != NULL) {
+        EVP_PKEY_CTX_free(evpCtx);
+    }
+
+    return ret;
 }
 
 static int sss_ecdsa_signature_get_ctx_params(void *ctx, OSSL_PARAM *params)
@@ -905,27 +1070,97 @@ static int sss_ecdsa_signature_get_ctx_params(void *ctx, OSSL_PARAM *params)
     int ret                              = 0;
     sss_provider_ecdsa_ctx_st *pEcdsaCtx = ctx;
     OSSL_PARAM *p;
-    uint8_t aid[] = AID_ECDSA_WITH_SHA256;
 
     sssProv_Print(LOG_DBG_ON, "Enter - %s \n", __FUNCTION__);
 
     ENSURE_OR_GO_CLEANUP(pEcdsaCtx != NULL);
 
-    /* TBD - To be updated for all SHA algorithms */
+    if (pEcdsaCtx->sha_algorithm == kAlgorithm_SSS_SHA1) {
+        uint8_t aid_sha1[] = AID_ECDSA_WITH_SHA1;
+        p                  = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_ALGORITHM_ID);
+        if (p != NULL && !OSSL_PARAM_set_octet_string(p, aid_sha1, sizeof(aid_sha1))) {
+            return 0;
+        }
 
-    p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_ALGORITHM_ID);
-    if (p != NULL && !OSSL_PARAM_set_octet_string(p, aid, sizeof(aid))) {
-        return 0;
+        p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_DIGEST_SIZE);
+        if (p != NULL && !OSSL_PARAM_set_size_t(p, 20)) {
+            return 0;
+        }
+
+        p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_DIGEST);
+        if (p != NULL && !OSSL_PARAM_set_utf8_string(p, "SHA1")) {
+            return 0;
+        }
     }
+    else if (pEcdsaCtx->sha_algorithm == kAlgorithm_SSS_SHA224) {
+        uint8_t aid_sha224[] = AID_ECDSA_WITH_SHA224;
+        p                    = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_ALGORITHM_ID);
+        if (p != NULL && !OSSL_PARAM_set_octet_string(p, aid_sha224, sizeof(aid_sha224))) {
+            return 0;
+        }
 
-    p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_DIGEST_SIZE);
-    if (p != NULL && !OSSL_PARAM_set_size_t(p, 32)) {
-        return 0;
+        p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_DIGEST_SIZE);
+        if (p != NULL && !OSSL_PARAM_set_size_t(p, 28)) {
+            return 0;
+        }
+
+        p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_DIGEST);
+        if (p != NULL && !OSSL_PARAM_set_utf8_string(p, "SHA224")) {
+            return 0;
+        }
     }
+    else if (pEcdsaCtx->sha_algorithm == kAlgorithm_SSS_SHA256) {
+        uint8_t aid_sha256[] = AID_ECDSA_WITH_SHA256;
+        p                    = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_ALGORITHM_ID);
+        if (p != NULL && !OSSL_PARAM_set_octet_string(p, aid_sha256, sizeof(aid_sha256))) {
+            return 0;
+        }
 
-    p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_DIGEST);
-    if (p != NULL && !OSSL_PARAM_set_utf8_string(p, "SHA256")) {
-        return 0;
+        p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_DIGEST_SIZE);
+        if (p != NULL && !OSSL_PARAM_set_size_t(p, 32)) {
+            return 0;
+        }
+
+        p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_DIGEST);
+        if (p != NULL && !OSSL_PARAM_set_utf8_string(p, "SHA256")) {
+            return 0;
+        }
+    }
+    else if (pEcdsaCtx->sha_algorithm == kAlgorithm_SSS_SHA384) {
+        uint8_t aid_sha384[] = AID_ECDSA_WITH_SHA384;
+
+        p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_ALGORITHM_ID);
+        if (p != NULL && !OSSL_PARAM_set_octet_string(p, aid_sha384, sizeof(aid_sha384))) {
+            return 0;
+        }
+
+        p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_DIGEST_SIZE);
+        if (p != NULL && !OSSL_PARAM_set_size_t(p, 48)) {
+            return 0;
+        }
+
+        p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_DIGEST);
+        if (p != NULL && !OSSL_PARAM_set_utf8_string(p, "SHA384")) {
+            return 0;
+        }
+    }
+    else if (pEcdsaCtx->sha_algorithm == kAlgorithm_SSS_SHA512) {
+        uint8_t aid_sha512[] = AID_ECDSA_WITH_SHA512;
+
+        p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_ALGORITHM_ID);
+        if (p != NULL && !OSSL_PARAM_set_octet_string(p, aid_sha512, sizeof(aid_sha512))) {
+            return 0;
+        }
+
+        p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_DIGEST_SIZE);
+        if (p != NULL && !OSSL_PARAM_set_size_t(p, 64)) {
+            return 0;
+        }
+
+        p = OSSL_PARAM_locate(params, OSSL_SIGNATURE_PARAM_DIGEST);
+        if (p != NULL && !OSSL_PARAM_set_utf8_string(p, "SHA512")) {
+            return 0;
+        }
     }
 
     ret = 1;
@@ -939,10 +1174,63 @@ static const OSSL_PARAM sss_gettable_ctx_params[] = {
     OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_DIGEST, NULL, 0),
     OSSL_PARAM_END};
 
-static const OSSL_PARAM *sss_ecdsa_signature_gettable_ctx_params(ossl_unused void *vpsm2ctx, ossl_unused void *provctx)
+static const OSSL_PARAM *sss_ecdsa_signature_gettable_ctx_params(ossl_unused void *ctx, ossl_unused void *provctx)
 {
     sssProv_Print(LOG_DBG_ON, "Enter - %s \n", __FUNCTION__);
     return sss_gettable_ctx_params;
+}
+
+static int sss_ecdsa_set_ctx_params(void *ctx, const OSSL_PARAM params[])
+{
+    sss_provider_ecdsa_ctx_st *pEcdsaCtx = ctx;
+    const OSSL_PARAM *p;
+
+    sssProv_Print(LOG_DBG_ON, "Enter - %s \n", __FUNCTION__);
+
+    p = OSSL_PARAM_locate_const(params, OSSL_SIGNATURE_PARAM_DIGEST);
+    if (p != NULL) {
+        switch (p->data_type) {
+        case OSSL_PARAM_UTF8_STRING: {
+            if (p->data == NULL) {
+                return 0;
+            }
+            if (strcmp(p->data, "SHA1") == 0) {
+                pEcdsaCtx->sha_algorithm = kAlgorithm_SSS_SHA1;
+            }
+            else if (strcmp(p->data, "SHA224") == 0) {
+                pEcdsaCtx->sha_algorithm = kAlgorithm_SSS_SHA224;
+            }
+            else if (strcmp(p->data, "SHA256") == 0) {
+                pEcdsaCtx->sha_algorithm = kAlgorithm_SSS_SHA256;
+            }
+            else if (strcmp(p->data, "SHA384") == 0) {
+                pEcdsaCtx->sha_algorithm = kAlgorithm_SSS_SHA384;
+            }
+            else if (strcmp(p->data, "SHA512") == 0) {
+                pEcdsaCtx->sha_algorithm = kAlgorithm_SSS_SHA512;
+            }
+            else {
+                sssProv_Print(LOG_ERR_ON, "sha not supported ! \n");
+                return 0;
+            }
+        } break;
+        default:
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
+static const OSSL_PARAM settable_ctx_params[] = {OSSL_PARAM_utf8_string(OSSL_SIGNATURE_PARAM_DIGEST, NULL, 0),
+    OSSL_PARAM_size_t(OSSL_SIGNATURE_PARAM_DIGEST_SIZE, NULL),
+    OSSL_PARAM_END};
+
+static const OSSL_PARAM *sss_ecdsa_settable_ctx_params(void *vctx, ossl_unused void *provctx)
+{
+    sssProv_Print(LOG_DBG_ON, "Enter - %s \n", __FUNCTION__);
+    (void)(vctx);
+    return settable_ctx_params;
 }
 
 const OSSL_DISPATCH sss_ecdsa_signature_functions[] = {
@@ -964,6 +1252,8 @@ const OSSL_DISPATCH sss_ecdsa_signature_functions[] = {
 
     {OSSL_FUNC_SIGNATURE_GET_CTX_PARAMS, (void (*)(void))sss_ecdsa_signature_get_ctx_params},
     {OSSL_FUNC_SIGNATURE_GETTABLE_CTX_PARAMS, (void (*)(void))sss_ecdsa_signature_gettable_ctx_params},
+    {OSSL_FUNC_SIGNATURE_SET_CTX_PARAMS, (void (*)(void))sss_ecdsa_set_ctx_params},
+    {OSSL_FUNC_SIGNATURE_SETTABLE_CTX_PARAMS, (void (*)(void))sss_ecdsa_settable_ctx_params},
 
     {0, NULL}};
 

@@ -1,5 +1,5 @@
 #
-# Copyright 2022 NXP
+# Copyright 2022,2024 NXP
 # SPDX-License-Identifier: Apache-2.0
 #
 import logging
@@ -36,7 +36,7 @@ SUPPORTED_EC_KEY_TYPES = [
     "brainpoolP256r1",
     "brainpoolP320r1",
     "brainpoolP384r1",
-#    "brainpoolP512r1",
+    "brainpoolP512r1",
 ]
 
 SUPPORTED_RSA_KEY_TYPES = [

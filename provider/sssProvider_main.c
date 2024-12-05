@@ -32,22 +32,23 @@
 #include "fsl_sss_ftr_default.h"
 #endif
 
-#include <string.h>
 #include "ex_sss_ports.h"
 #include "sssProvider_main.h"
+#include <string.h>
 
 /* ********************** Constants ************************** */
 #define SSS_PROVIDER_NAME "NXP Provider"
-#define SSS_PROVIDER_VERSION "1.0.3"
+#define SSS_PROVIDER_VERSION "1.1.0"
 #define SSSPROV_MAX_PRINT_BUF_SIZE (511)
 
 /* ********************** Global variables ************************** */
 
 // Adjust to the required default log level.
-//static int SSSPROV_LogControl = (LOG_ERR_ON | LOG_DBG_ON | LOG_FLOW_ON); // Full log
+// static int SSSPROV_LogControl = (LOG_ERR_ON | LOG_DBG_ON | LOG_FLOW_ON); //
+// Full log
 static int SSSPROV_LogControl = (LOG_ERR_ON | LOG_FLOW_ON); // Only Errors and flow logs
 
-//SE boot context
+// SE boot context
 ex_sss_boot_ctx_t gProvider_boot_ctx;
 
 /* ********************** Private funtions ******************* */
@@ -91,7 +92,8 @@ static int sss_get_params(void *provctx, OSSL_PARAM params[])
 extern int sss_get_capabilities(const OSSL_PROVIDER *prov, const char *capability, OSSL_CALLBACK *cb, void *arg);
 
 extern const OSSL_DISPATCH sss_rand_functions[];
-static const OSSL_ALGORITHM sss_rands[] = {{"CTR-DRBG", "provider=nxp_prov", sss_rand_functions}, {NULL, NULL, NULL}};
+static const OSSL_ALGORITHM sss_rands[] = {
+    {"CTR-DRBG", "provider=nxp_prov,fips=yes,nxp_prov.rand=yes", sss_rand_functions}, {NULL, NULL, NULL}};
 
 #if SSS_HAVE_ECC
 extern OSSL_DISPATCH sss_ec_keymgmt_functions[];
@@ -103,17 +105,21 @@ extern OSSL_DISPATCH sss_rsa_keymgmt_dispatch[];
 
 static const OSSL_ALGORITHM sss_keymgmts[] = {
 #if SSS_HAVE_ECC
-    {"EC:id-ecPublicKey", "provider=nxp_prov", sss_ec_keymgmt_functions},
+    {"EC:id-ecPublicKey",
+        "provider=nxp_prov,fips=yes,nxp_prov.keymgmt=yes,nxp_prov.keymgmt.ec=yes",
+        sss_ec_keymgmt_functions},
 #endif //#if SSS_HAVE_ECC
 #if SSS_HAVE_RSA
-    {"RSA:RSASSA", "provider=nxp_prov", sss_rsa_keymgmt_dispatch},
+    {"RSA:RSASSA",
+        "provider=nxp_prov,fips=yes,nxp_prov.keymgmt=yes,nxp_prov.keymgmt.rsa=yes",
+        sss_rsa_keymgmt_dispatch},
 #endif //#if SSS_HAVE_RSA
     {NULL, NULL, NULL}};
 
 #if SSS_HAVE_RSA
 extern const OSSL_DISPATCH sss_rsa_enc_functions[];
 static const OSSL_ALGORITHM sss_rsa_enc[] = {
-    {"RSAENC-SE05X", "provider=nxp_prov", sss_rsa_enc_functions}, {NULL, NULL, NULL}};
+    {"RSAENC-SE05X", "provider=nxp_prov,fips=yes,nxp_prov.asym_cipher=yes", sss_rsa_enc_functions}, {NULL, NULL, NULL}};
 #endif //#if SSS_HAVE_RSA
 
 #if SSS_HAVE_ECC
@@ -126,10 +132,14 @@ extern const OSSL_DISPATCH sss_rsa_signature_functions[];
 
 static const OSSL_ALGORITHM sss_signatures[] = {
 #if SSS_HAVE_ECC
-    {"ECDSA", "provider=nxp_prov", sss_ecdsa_signature_functions},
+    {"ECDSA",
+        "provider=nxp_prov,fips=yes,nxp_prov.signature=yes,nxp_prov.signature.ecdsa=yes",
+        sss_ecdsa_signature_functions},
 #endif //#if SSS_HAVE_ECC
 #if SSS_HAVE_RSA
-    {"RSASSA-SE05X", "provider=nxp_prov", sss_rsa_signature_functions},
+    {"RSA",
+        "provider=nxp_prov,fips=yes,nxp_prov.signature=yes,nxp_prov.signature.rsa=yes",
+        sss_rsa_signature_functions},
 #endif
     {NULL, NULL, NULL}};
 
@@ -139,14 +149,15 @@ extern const OSSL_DISPATCH sss_ecdh_keyexch_functions[];
 
 static const OSSL_ALGORITHM sss_keyexchs[] = {
 #if SSS_HAVE_ECC
-    {"ECDH", "provider=nxp_prov", sss_ecdh_keyexch_functions},
+    {"ECDH", "provider=nxp_prov,fips=yes,nxp_prov.keyexch=yes", sss_ecdh_keyexch_functions},
 #endif
     {NULL, NULL, NULL}};
 
 extern const OSSL_DISPATCH sss_store_object_functions[];
 extern const OSSL_DISPATCH sss_file_store_object_functions[];
-static const OSSL_ALGORITHM sss_store[] = {{"nxp", "provider=nxp_prov", sss_store_object_functions},
-    {"file", "provider=nxp_prov", sss_file_store_object_functions},
+static const OSSL_ALGORITHM sss_store[] = {
+    {"nxp", "provider=nxp_prov,fips=yes,nxp_prov.store=yes,nxp_prov.store.nxp=yes", sss_store_object_functions},
+    {"file", "provider=nxp_prov,fips=yes,nxp_prov.store=yes,nxp_prov.store.file=yes", sss_file_store_object_functions},
     {NULL, NULL, NULL}};
 
 static const OSSL_ALGORITHM *sss_query_operation(void *provctx, int operation_id, int *no_cache)
@@ -154,8 +165,10 @@ static const OSSL_ALGORITHM *sss_query_operation(void *provctx, int operation_id
     *no_cache = 0;
     (void)(provctx);
     switch (operation_id) {
+#ifndef SSS_PROV_DISABLE_SE05X_RNG
     case OSSL_OP_RAND:
         return sss_rands;
+#endif
     case OSSL_OP_KEYMGMT:
         return sss_keymgmts;
     case OSSL_OP_SIGNATURE:
@@ -188,7 +201,7 @@ static const OSSL_DISPATCH sss_dispatch_table[] = {
     {OSSL_FUNC_PROVIDER_TEARDOWN, (void (*)(void))sss_teardown},
     {OSSL_FUNC_PROVIDER_GETTABLE_PARAMS, (void (*)(void))sss_gettable_params},
     {OSSL_FUNC_PROVIDER_GET_PARAMS, (void (*)(void))sss_get_params},
-    {OSSL_FUNC_PROVIDER_GET_CAPABILITIES, (void (*)(void)) sss_get_capabilities},
+    {OSSL_FUNC_PROVIDER_GET_CAPABILITIES, (void (*)(void))sss_get_capabilities},
     {0, NULL}};
 
 OPENSSL_EXPORT int OSSL_provider_init(
@@ -197,8 +210,8 @@ OPENSSL_EXPORT int OSSL_provider_init(
     sss_status_t status = kStatus_SSS_Fail;
     char *portName;
 
-    //Load default provider to use random generation during SCP03 connection
-    //if (NULL == OSSL_PROVIDER_load(NULL, "default")) {
+    // Load default provider to use random generation during SCP03 connection
+    // if (NULL == OSSL_PROVIDER_load(NULL, "default")) {
     //    sssProv_Print(LOG_FLOW_ON, "error in OSSL_PROVIDER_load \n");
     //}
 

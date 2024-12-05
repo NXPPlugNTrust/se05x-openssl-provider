@@ -13,8 +13,8 @@
  */
 
 /* ********************** Include files ********************** */
-#include <openssl/core_names.h>
 #include "sssProvider_main.h"
+#include <openssl/core_names.h>
 
 /* ********************** Constants ************************** */
 #ifdef SE05X_MAX_BUF_SIZE_RSP

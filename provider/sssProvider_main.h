@@ -4,7 +4,7 @@
  * @version 1.0
  * @par License
  *
- * Copyright 2022 NXP
+ * Copyright 2022,2024 NXP
  * SPDX-License-Identifier: Apache-2.0
  *
  */
@@ -73,10 +73,17 @@ static const SSS_TYPE_KEY_MAP_ST sss_type_key_map[MAX_SSS_TYPE_KEY_MAP_ENTRIES] 
     {kSSS_CipherType_EC_BRAINPOOL, 384, "brainpoolP384r1"},
     {kSSS_CipherType_EC_BRAINPOOL, 512, "brainpoolP512r1"},
 
+#ifdef SSS_PROV_GENERATE_RSA_PLAIN
     {kSSS_CipherType_RSA, 1024, "rsa1024"},
     {kSSS_CipherType_RSA, 2048, "rsa2048"},
     {kSSS_CipherType_RSA, 3072, "rsa3072"},
     {kSSS_CipherType_RSA, 4096, "rsa4096"},
+#else
+    {kSSS_CipherType_RSA_CRT, 1024, "rsa1024"},
+    {kSSS_CipherType_RSA_CRT, 2048, "rsa2048"},
+    {kSSS_CipherType_RSA_CRT, 3072, "rsa3072"},
+    {kSSS_CipherType_RSA_CRT, 4096, "rsa4096"},
+#endif
 
     /* This has to be the last */
     {0, 0, ""},
@@ -85,14 +92,54 @@ static const SSS_TYPE_KEY_MAP_ST sss_type_key_map[MAX_SSS_TYPE_KEY_MAP_ENTRIES] 
 /* Algorith identifiers */
 
 /* clang-format off */
+#define AID_ECDSA_WITH_SHA1 \
+{ \
+    0x30, 0x09, 0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x04, 0x01 \
+}
+
+#define AID_ECDSA_WITH_SHA224 \
+{ \
+    0x30, 0x0a, 0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x04, 0x03, 0x01 \
+}
+
 #define AID_ECDSA_WITH_SHA256 \
 { \
     0x30, 0x0a, 0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x04, 0x03, 0x02 \
 }
 
+#define AID_ECDSA_WITH_SHA384 \
+{ \
+    0x30, 0x0a, 0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x04, 0x03, 0x03 \
+}
+
+#define AID_ECDSA_WITH_SHA512 \
+{ \
+    0x30, 0x0a, 0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x04, 0x03, 0x04 \
+}
+
+#define AID_RSA_WITH_SHA1 \
+{ \
+    0x30, 0x0d, 0x06, 0x09, 0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x01, 0x05, 0x05, 0x00 \
+}
+
+#define AID_RSA_WITH_SHA224 \
+{ \
+    0x30, 0x0d, 0x06, 0x09, 0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x01, 0x0E, 0x05, 0x00 \
+}
+
 #define AID_RSA_WITH_SHA256 \
 { \
     0x30, 0x0d, 0x06, 0x09, 0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x01, 0x0B, 0x05, 0x00 \
+}
+
+#define AID_RSA_WITH_SHA384 \
+{ \
+    0x30, 0x0d, 0x06, 0x09, 0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x01, 0x0C, 0x05, 0x00 \
+}
+
+#define AID_RSA_WITH_SHA512 \
+{ \
+    0x30, 0x0d, 0x06, 0x09, 0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x01, 0x0D, 0x05, 0x00 \
 }
 /* clang-format on */
 
@@ -107,18 +154,24 @@ typedef struct
 
 typedef struct
 {
+    sss_provider_context_t *pProvCtx;
     uint32_t keyid;
     uint16_t key_len;
     int maxSize;
     sss_object_t object;
-    bool isFile;
-    FILE *pFile;
-    EVP_PKEY *pEVPPkey;
-    sss_provider_context_t *pProvCtx;
     bool isPrivateKey;
+    FILE *pFile;
+    /* Store SE public key (To avoid multiple reads)*/
+    uint8_t pub_key[256];
+    uint8_t pub_key_len;
+    /*Host Key */
+    EVP_PKEY *pEVPPkey;
+    int expected_type;
     /* For rsa key gen */
     int primes;
     BIGNUM *rsa_e;
+    /* To determine how the key is stored */
+    bool isEVPKey;
 } sss_provider_store_obj_t;
 
 /* ********************** Function Prototypes **************** */

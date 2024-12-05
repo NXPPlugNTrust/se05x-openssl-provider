@@ -1,5 +1,5 @@
 #
-# Copyright 2023 NXP
+# Copyright 2023-2024 NXP
 # SPDX-License-Identifier: Apache-2.0
 #
 import argparse
@@ -26,6 +26,8 @@ def main():
         if not os.path.exists(output_keys_dir):
             os.mkdir(output_keys_dir)
 
+        sha_types = ["sha1",  "sha224",  "sha256",  "sha384",  "sha512"]
+
         if key_type == "rsa1024":
             key_type_bits = "1024"
         elif key_type == "rsa2048":
@@ -51,10 +53,11 @@ def main():
         log.info("\n########### Generate RSA Keys Using Openssl Provider at 0xEF000011 location ###############")
         run("%s genrsa --provider %s --provider default -out %s %s" %(openssl_bin, provider, ref_rsa_key_0xEF000011, key_type_bits))
 
-        log.info("\n########### Create CSR and Certificate for ket at location 0xEF000011 using openssl provider ###############")
-        run("%s req -new --provider %s --provider default -key %s %s -out %s" %(openssl_bin, provider, ref_rsa_key_0xEF000011, subject, output_csr))
-        run("%s x509 -req --provider %s --provider default -in %s -CAcreateserial -out %s -days 5000 -CA %s -CAkey %s" %(openssl_bin, provider, output_csr, output_crt, rootca_cer, rootca_key))
-        run("%s x509 -in %s -text -noout" %(openssl_bin, output_crt))
+        for sha_type in sha_types:
+            log.info("\n########### Create CSR and Certificate for ket at location 0xEF000011 using openssl provider ###############")
+            run("%s req -new --provider %s --provider default -key %s %s -out %s -%s" %(openssl_bin, provider, ref_rsa_key_0xEF000011, subject, output_csr, sha_type))
+            run("%s x509 -req --provider %s --provider default -in %s -CAcreateserial -out %s -days 5000 -CA %s -CAkey %s -%s" %(openssl_bin, provider, output_csr, output_crt, rootca_cer, rootca_key, sha_type))
+            run("%s x509 -in %s -text -noout" %(openssl_bin, output_crt))
 
     log.info("##############################################################")
     log.info("#                                                            #")

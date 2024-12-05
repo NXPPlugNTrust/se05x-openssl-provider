@@ -21,8 +21,8 @@
 #if SSS_HAVE_ECC
 
 /* ********************** Include files ********************** */
-#include <string.h>
 #include "sssProvider_main.h"
+#include <string.h>
 
 /* ********************** structure definition *************** */
 typedef struct
@@ -79,8 +79,7 @@ static int sss_ecdh_keyexch_set_peer(void *ctx, void *provkey)
     sss_provider_ecdh_ctx_st *pEcdhctx  = ctx;
     sssProv_Print(LOG_DBG_ON, "Enter - %s \n", __FUNCTION__);
     ENSURE_OR_GO_CLEANUP(pEcdhctx != NULL && pStoreCtx != NULL);
-    pEcdhctx->pPeerEVPPkey = pStoreCtx->pEVPPkey;
-    pStoreCtx->pEVPPkey    = NULL;
+    pEcdhctx->pPeerEVPPkey = EVP_PKEY_dup(pStoreCtx->pEVPPkey);
     ret                    = 1;
 cleanup:
     return ret;
@@ -100,7 +99,7 @@ static int sss_ecdh_keyexch_derive(void *ctx, unsigned char *secret, size_t *sec
     ENSURE_OR_GO_CLEANUP(secretlen != NULL);
     ENSURE_OR_GO_CLEANUP(pEcdhctx->pPeerEVPPkey != NULL);
 
-    if (pEcdhctx->pStoreObjCtx->keyid != 0) {
+    if (pEcdhctx->pStoreObjCtx->isEVPKey == 0) {
         ENSURE_OR_GO_CLEANUP(pEcdhctx->pProvCtx != NULL);
         ENSURE_OR_GO_CLEANUP(pEcdhctx->pProvCtx->p_ex_sss_boot_ctx != NULL);
 
@@ -156,7 +155,7 @@ static int sss_ecdh_keyexch_derive(void *ctx, unsigned char *secret, size_t *sec
 
             sssProv_Print(LOG_FLOW_ON, "Not a key in secure element. Performing ECDH on host software \n");
 
-            evpCtx = EVP_PKEY_CTX_new_from_pkey(NULL, pEcdhctx->pStoreObjCtx->pEVPPkey, NULL);
+            evpCtx = EVP_PKEY_CTX_new_from_pkey(NULL, pEcdhctx->pStoreObjCtx->pEVPPkey, "provider!=nxp_prov");
             ENSURE_OR_GO_CLEANUP(evpCtx != NULL);
 
             EVP_PKEY_derive_init(evpCtx);

@@ -13,11 +13,11 @@
  */
 
 /* ********************** Include files ********************** */
+#include "sssProvider_main.h"
 #include <openssl/core_names.h>
 #include <openssl/core_object.h>
-#include <string.h>
 #include <openssl/pem.h>
-#include "sssProvider_main.h"
+#include <string.h>
 
 /* ********************** Funtions declarations ******************* */
 
@@ -35,6 +35,10 @@ static void *sss_store_object_open(void *provctx, const char *uri)
     unsigned long int value = 0;
     EVP_PKEY *pEVPKey       = NULL;
     int ret                 = 1;
+    char buf[30]            = {
+        0,
+    };
+    bool isPEM = false;
 
     sssProv_Print(LOG_DBG_ON, "Enter - %s \n", __FUNCTION__);
 
@@ -60,10 +64,11 @@ static void *sss_store_object_open(void *provctx, const char *uri)
 
         pStoreCtx->keyid    = value;
         pStoreCtx->pProvCtx = provctx;
-        pStoreCtx->isFile   = 0;
+        pStoreCtx->isEVPKey = 0;
     }
     else {
-        //Extracting the file path
+        // Reference key files with nxp: prefix comes here.
+        // Extracting the file path
         char *filePath = strchr(baseuri, ':');
         if (filePath != NULL) {
             filePath++;
@@ -81,8 +86,33 @@ static void *sss_store_object_open(void *provctx, const char *uri)
             return NULL;
         }
 
-        // Read Pem file
-        pEVPKey = PEM_read_PrivateKey(pFile, NULL, NULL, NULL);
+        if (fgets(buf, sizeof(buf), pFile) == NULL) {
+            if (fclose(pFile) != 0) {
+                sssProv_Print(LOG_FLOW_ON, "file close failed \n");
+            }
+            OPENSSL_free(pStoreCtx);
+            OPENSSL_free(baseuri);
+            return NULL;
+        }
+        if (fseek(pFile, 0, SEEK_SET) != 0) {
+            if (fclose(pFile) != 0) {
+                sssProv_Print(LOG_FLOW_ON, "file close failed \n");
+            }
+            OPENSSL_free(pStoreCtx);
+            OPENSSL_free(baseuri);
+            return NULL;
+        }
+        if (strstr(buf, "-----BEGIN") != NULL) {
+            isPEM = true;
+        }
+
+        // Read file
+        if (isPEM) {
+            pEVPKey = PEM_read_PrivateKey(pFile, NULL, NULL, NULL);
+        }
+        else {
+            pEVPKey = d2i_PrivateKey_fp(pFile, NULL);
+        }
         if (pEVPKey == NULL) {
             if (fclose(pFile) != 0) {
                 sssProv_Print(LOG_FLOW_ON, "file close failed \n");
@@ -218,8 +248,43 @@ static int sss_store_object_close(void *ctx)
     return 1;
 }
 
+static const OSSL_PARAM *sss_store_settable_ctx_params(void *provctx)
+{
+    sssProv_Print(LOG_DBG_ON, "Enter - %s \n", __FUNCTION__);
+    (void)(provctx);
+    static const OSSL_PARAM known_settable_ctx_params[] = {OSSL_PARAM_utf8_string(OSSL_STORE_PARAM_PROPERTIES, NULL, 0),
+        OSSL_PARAM_int(OSSL_STORE_PARAM_EXPECT, NULL),
+        OSSL_PARAM_END};
+    return known_settable_ctx_params;
+}
+
+static int sss_store_set_ctx_params(void *ctx, const OSSL_PARAM params[])
+{
+    sss_provider_store_obj_t *pStoreCtx = (sss_provider_store_obj_t *)ctx;
+    sssProv_Print(LOG_DBG_ON, "Enter - %s \n", __FUNCTION__);
+
+    char *propq = NULL;
+
+    const OSSL_PARAM *p = OSSL_PARAM_locate_const(params, OSSL_STORE_PARAM_PROPERTIES);
+    if (p != NULL && !OSSL_PARAM_get_utf8_string(p, &propq, 0))
+        return 0;
+
+    p = OSSL_PARAM_locate_const(params, OSSL_STORE_PARAM_EXPECT);
+    if (p != NULL && !OSSL_PARAM_get_int(p, &pStoreCtx->expected_type)) {
+        return 0;
+    }
+
+    if (propq != NULL) {
+        free(propq); /*propq is not being used as of now*/
+    }
+
+    return 1;
+}
+
 const OSSL_DISPATCH sss_store_object_functions[] = {{OSSL_FUNC_STORE_OPEN, (void (*)(void))sss_store_object_open},
     {OSSL_FUNC_STORE_LOAD, (void (*)(void))sss_store_object_load},
     {OSSL_FUNC_STORE_EOF, (void (*)(void))sss_store_object_eof},
     {OSSL_FUNC_STORE_CLOSE, (void (*)(void))sss_store_object_close},
+    {OSSL_FUNC_STORE_SETTABLE_CTX_PARAMS, (void (*)(void))sss_store_settable_ctx_params},
+    {OSSL_FUNC_STORE_SET_CTX_PARAMS, (void (*)(void))sss_store_set_ctx_params},
     {0, NULL}};

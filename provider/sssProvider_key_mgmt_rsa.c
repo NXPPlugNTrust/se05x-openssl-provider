@@ -21,10 +21,10 @@
 #if SSS_HAVE_RSA
 
 /* ********************** Include files ********************** */
-#include <openssl/core_names.h>
-#include <fsl_sss_util_asn1_der.h>
-#include <openssl/pem.h>
 #include "sssProvider_main.h"
+#include <fsl_sss_util_asn1_der.h>
+#include <openssl/core_names.h>
+#include <openssl/pem.h>
 #include <string.h>
 
 /* ********************** Defines **************************** */
@@ -35,6 +35,9 @@
     {                                                  \
         0xB6, 0xB5, 0xA6, 0xA5, 0xB6, 0xB5, 0xA6, 0xA5 \
     }
+
+#define SSS_ENABLE_RSA_KEYMGMT_IMPORT_FUNC
+#define RSA_SIGNATURE_REFKEY_ID 0xB6B5A6A5
 
 /* ********************** Private funtions ******************* */
 
@@ -71,11 +74,35 @@ static void *sss_rsa_keymgmt_load(const void *reference, size_t reference_sz)
     return pStoreCtx;
 }
 
+#ifdef SSS_ENABLE_RSA_KEYMGMT_IMPORT_FUNC
+static void *sss_rsa_keymgmt_new(void *provctx)
+{
+    sss_provider_store_obj_t *pStoreCtx = OPENSSL_zalloc(sizeof(sss_provider_store_obj_t));
+
+    sssProv_Print(LOG_DBG_ON, "Enter - %s \n", __FUNCTION__);
+    if (pStoreCtx != NULL) {
+        pStoreCtx->pProvCtx = provctx;
+    }
+
+    return pStoreCtx;
+}
+#endif /*SSS_ENABLE_RSA_KEYMGMT_IMPORT_FUNC*/
+
 static void sss_rsa_keymgmt_free(void *keydata)
 {
+    sss_provider_store_obj_t *pStoreCtx = (sss_provider_store_obj_t *)keydata;
     sssProv_Print(LOG_DBG_ON, "Enter - %s \n", __FUNCTION__);
-    OPENSSL_free(keydata);
-    return;
+
+    if (pStoreCtx != NULL) {
+        if (pStoreCtx->pEVPPkey != NULL) {
+            EVP_PKEY_free(pStoreCtx->pEVPPkey);
+            pStoreCtx->pEVPPkey = NULL;
+        }
+    }
+
+    if (keydata != NULL) {
+        OPENSSL_free(keydata);
+    }
 }
 
 static int sss_rsa_keymgmt_get_params(void *keydata, OSSL_PARAM params[])
@@ -86,10 +113,11 @@ static int sss_rsa_keymgmt_get_params(void *keydata, OSSL_PARAM params[])
     sss_se05x_session_t *pSession       = (sss_se05x_session_t *)&pStoreCtx->pProvCtx->p_ex_sss_boot_ctx->session;
     OSSL_PARAM *p;
     int ret                 = 0;
-    int keylen_bits         = 0;
-    uint8_t public_key[256] = {0};
+    uint8_t public_key[550] = {0};
     size_t public_key_len   = sizeof(public_key);
     size_t pbKeyBitLen      = sizeof(public_key) * 8;
+    uint8_t modulus[512]    = {0};
+    size_t modLen           = sizeof(modulus);
 
     sssProv_Print(LOG_DBG_ON, "Enter - %s \n", __FUNCTION__);
 
@@ -99,11 +127,11 @@ static int sss_rsa_keymgmt_get_params(void *keydata, OSSL_PARAM params[])
 
     ENSURE_OR_GO_CLEANUP(pStoreCtx != NULL);
 
-    if (pStoreCtx->isFile) {
+    if (pStoreCtx->isEVPKey) {
         ENSURE_OR_GO_CLEANUP(pStoreCtx->pEVPPkey != NULL);
 
         /* EVP_PKEY_size() returns the maximum suitable size for the output buffers
-        for almost all operations that can be done with pkey */
+    for almost all operations that can be done with pkey */
         pStoreCtx->maxSize = EVP_PKEY_size(pStoreCtx->pEVPPkey);
 
         p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_BITS);
@@ -114,6 +142,10 @@ static int sss_rsa_keymgmt_get_params(void *keydata, OSSL_PARAM params[])
         if (p != NULL && !OSSL_PARAM_set_int(p, pStoreCtx->maxSize)) { /* Signature size */
             goto cleanup;
         }
+        p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_SECURITY_BITS);
+        if (p != NULL && !OSSL_PARAM_set_int(p, EVP_PKEY_security_bits(pStoreCtx->pEVPPkey))) {
+            goto cleanup;
+        }
     }
     else {
         ENSURE_OR_GO_CLEANUP(pStoreCtx->pProvCtx != NULL);
@@ -122,13 +154,11 @@ static int sss_rsa_keymgmt_get_params(void *keydata, OSSL_PARAM params[])
         pSession = (sss_se05x_session_t *)&pStoreCtx->pProvCtx->p_ex_sss_boot_ctx->session;
         ENSURE_OR_GO_CLEANUP(pSession != NULL);
 
-        //Get the size of the key
+        // Get the size of the key
         smStatus = Se05x_API_ReadSize(&(pSession->s_ctx), pStoreCtx->keyid, &(pStoreCtx->key_len));
         if (smStatus != SM_OK) {
             return 0;
         }
-
-        keylen_bits = pStoreCtx->key_len * 8;
 
         p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_BITS);
         if (p != NULL && !OSSL_PARAM_set_int(p, (pStoreCtx->key_len) * 8)) {
@@ -151,8 +181,26 @@ static int sss_rsa_keymgmt_get_params(void *keydata, OSSL_PARAM params[])
             bn_pub_key   = BN_bin2bn(public_key, public_key_len, NULL);
             p->data_size = public_key_len;
             if (!OSSL_PARAM_set_BN(p, bn_pub_key)) {
+                BN_free(bn_pub_key);
                 goto cleanup;
             }
+            BN_free(bn_pub_key);
+        }
+
+        p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_RSA_N);
+        if (p != NULL) {
+            BIGNUM *bn_n = NULL;
+            smStatus     = Se05x_API_ReadRSA(
+                &pSession->s_ctx, pStoreCtx->object.keyId, 0, 0, kSE05x_RSAPubKeyComp_MOD, modulus, &modLen);
+            ENSURE_OR_GO_CLEANUP(smStatus == SM_OK);
+
+            bn_n         = BN_bin2bn(modulus, modLen, NULL);
+            p->data_size = modLen;
+            if (!OSSL_PARAM_set_BN(p, bn_n)) {
+                BN_free(bn_n);
+                goto cleanup;
+            }
+            BN_free(bn_n);
         }
 
         p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_DEFAULT_DIGEST);
@@ -188,7 +236,7 @@ static const char *sss_rsa_keymgmt_query_operation_name(int operation_id)
 {
     sssProv_Print(LOG_DBG_ON, "Enter - %s \n", __FUNCTION__);
     if (operation_id == OSSL_OP_SIGNATURE) {
-        return "RSASSA-SE05X";
+        return "RSA";
     }
     else if (operation_id == OSSL_OP_ASYM_CIPHER) {
         return "RSAENC-SE05X";
@@ -209,7 +257,7 @@ static int sss_rsa_keymgmt_has(const void *keydata, int selection)
         return 0;
     }
 
-    if (pStoreCtx->isFile) {
+    if (pStoreCtx->isEVPKey) {
         if (pStoreCtx->pEVPPkey == NULL) {
             return 0;
         }
@@ -222,6 +270,9 @@ static int sss_rsa_keymgmt_has(const void *keydata, int selection)
             else if (selection == OSSL_KEYMGMT_SELECT_PUBLIC_KEY) {
                 int ret = (pStoreCtx->isPrivateKey) ? (0) : (ok);
                 return ret;
+            }
+            else if (selection == OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS) {
+                return ok;
             }
             else {
                 // Any other - return 0.
@@ -251,12 +302,133 @@ static int sss_rsa_keymgmt_has(const void *keydata, int selection)
                 return 0;
             }
         }
+        else if (selection == OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS) {
+            if (pStoreCtx->object.cipherType == kSSS_CipherType_RSA ||
+                pStoreCtx->object.cipherType == kSSS_CipherType_RSA_CRT) {
+                return ok;
+            }
+            else {
+                return 0;
+            }
+        }
         else {
             // Any other - return 0.
             return 0;
         }
     }
 }
+
+#ifdef SSS_ENABLE_RSA_KEYMGMT_IMPORT_FUNC
+static int sss_rsa_keymgmt_import(void *keydata, int selection, OSSL_PARAM params[])
+{
+    sss_status_t status                 = kStatus_SSS_Fail;
+    sss_provider_store_obj_t *pStoreCtx = (sss_provider_store_obj_t *)keydata;
+    sssProv_Print(LOG_DBG_ON, "Enter - %s \n", __FUNCTION__);
+
+    BIGNUM *bn_coeff       = NULL;
+    size_t coeff_len       = 0;
+    uint8_t *coeff_data    = NULL;
+    uint32_t factor2       = 0;
+    int res                = 0;
+    unsigned int magic_num = {0};
+    BIGNUM *bn_n           = NULL;
+    size_t n_len           = 0;
+
+    if (selection & OSSL_KEYMGMT_SELECT_KEYPAIR) {
+        OSSL_PARAM *param = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_RSA_D);
+        if (param != NULL) {
+            param = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_RSA_COEFFICIENT1);
+            ENSURE_OR_GO_CLEANUP(param != NULL);
+
+            res = OSSL_PARAM_get_BN(param, &bn_coeff);
+            ENSURE_OR_GO_CLEANUP(res == 1);
+
+            coeff_len = BN_num_bytes(bn_coeff);
+            ENSURE_OR_GO_CLEANUP(coeff_len != 0);
+
+            coeff_data = (uint8_t *)OPENSSL_malloc(coeff_len);
+            ENSURE_OR_GO_CLEANUP(coeff_data != NULL);
+
+            res = BN_bn2bin(bn_coeff, coeff_data);
+            ENSURE_OR_GO_CLEANUP(res == (int)coeff_len);
+
+            magic_num = coeff_data[0] | (coeff_data[1] << 8) | (coeff_data[2] << 16) | (coeff_data[3] << 24);
+
+            param = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_RSA_N);
+            ENSURE_OR_GO_CLEANUP(param != NULL);
+
+            res = OSSL_PARAM_get_BN(param, &bn_n);
+            ENSURE_OR_GO_CLEANUP(res == 1);
+
+            n_len = BN_num_bytes(bn_n);
+            ENSURE_OR_GO_CLEANUP(n_len != 0);
+
+            pStoreCtx->key_len = n_len;
+            ENSURE_OR_GO_CLEANUP(pStoreCtx->key_len != 0);
+
+            if (magic_num != RSA_SIGNATURE_REFKEY_ID) {
+                sssProv_Print(LOG_DBG_ON,
+                    "Key not handled in sssProvider (Not a ref "
+                    "key). Fall back to default provider\n");
+                status = kStatus_SSS_Fail;
+                goto cleanup;
+            }
+            else {
+                param = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_RSA_FACTOR2);
+                ENSURE_OR_GO_CLEANUP(param != NULL);
+
+                if (!OSSL_PARAM_get_uint32(param, &factor2)) {
+                    goto cleanup;
+                }
+
+                pStoreCtx->keyid = factor2;
+                ENSURE_OR_GO_CLEANUP(pStoreCtx->keyid != 0);
+
+                status = sss_key_object_init(&(pStoreCtx->object), &pStoreCtx->pProvCtx->p_ex_sss_boot_ctx->ks);
+                ENSURE_OR_GO_CLEANUP(status == kStatus_SSS_Success);
+
+                status = sss_key_object_get_handle(&(pStoreCtx->object), pStoreCtx->keyid);
+                ENSURE_OR_GO_CLEANUP(status == kStatus_SSS_Success);
+
+                pStoreCtx->isEVPKey = 0;
+            }
+        }
+        else {
+            sssProv_Print(LOG_DBG_ON, "Key not handled in sssProvider. Fall back to default provider\n");
+            status = kStatus_SSS_Fail;
+            goto cleanup;
+        }
+    }
+
+cleanup:
+    if (coeff_data != NULL) {
+        OPENSSL_free(coeff_data);
+    }
+    if (bn_coeff != NULL) {
+        BN_free(bn_coeff);
+    }
+    if (bn_n != NULL) {
+        BN_free(bn_n);
+    }
+    if (status != kStatus_SSS_Success) {
+        return 0;
+    }
+    return 1;
+}
+
+static const OSSL_PARAM *sss_rsa_keymgmt_import_types(int selection)
+{
+    static OSSL_PARAM importable_params[4] = {0};
+    sssProv_Print(LOG_DBG_ON, "Enter - %s \n", __FUNCTION__);
+    (void)(selection);
+
+    importable_params[0] = OSSL_PARAM_construct_BN(OSSL_PKEY_PARAM_RSA_N, NULL, 0);
+    importable_params[1] = OSSL_PARAM_construct_BN(OSSL_PKEY_PARAM_RSA_E, NULL, 0);
+    importable_params[2] = OSSL_PARAM_construct_BN(OSSL_PKEY_PARAM_RSA_D, NULL, 0);
+    importable_params[3] = OSSL_PARAM_construct_end();
+    return importable_params;
+}
+#endif /*SSS_ENABLE_RSA_KEYMGMT_IMPORT_FUNC*/
 
 static int sss_rsa_keymgmt_export(void *keydata, int selection, OSSL_CALLBACK *param_cb, void *cbarg)
 {
@@ -274,26 +446,26 @@ static int sss_rsa_keymgmt_export(void *keydata, int selection, OSSL_CALLBACK *p
     uint8_t cofficient[4]               = {0xB6, 0xB5, 0xA6, 0xA5}; /*Magic Number*/
     smStatus_t sm_status                = SM_NOT_OK;
     sss_se05x_session_t *pSession       = (sss_se05x_session_t *)&pStoreCtx->pProvCtx->p_ex_sss_boot_ctx->session;
-    OSSL_PARAM params_tmp[2]                = {
+    OSSL_PARAM params_tmp[2]            = {
         0,
     };
 
     sssProv_Print(LOG_DBG_ON, "Enter - %s \n", __FUNCTION__);
 
-    if (pStoreCtx->isFile == 1) {
+    if (pStoreCtx->isEVPKey == 1) {
         ENSURE_OR_GO_CLEANUP(pStoreCtx->pEVPPkey != NULL);
 
         if (selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) {
             params_tmp[0] = OSSL_PARAM_construct_BN(OSSL_PKEY_PARAM_RSA_N, modulus, modLen);
             params_tmp[1] = OSSL_PARAM_construct_end();
             ENSURE_OR_GO_CLEANUP(EVP_PKEY_get_params(pStoreCtx->pEVPPkey, params_tmp) == 1);
-            modLen = params_tmp[0].return_size;
-            params[i++]    = OSSL_PARAM_construct_BN(OSSL_PKEY_PARAM_RSA_N, modulus, modLen);
+            modLen      = params_tmp[0].return_size;
+            params[i++] = OSSL_PARAM_construct_BN(OSSL_PKEY_PARAM_RSA_N, modulus, modLen);
 
             params_tmp[0] = OSSL_PARAM_construct_BN(OSSL_PKEY_PARAM_RSA_E, pubExponent, pubExponentLen);
             params_tmp[1] = OSSL_PARAM_construct_end();
             ENSURE_OR_GO_CLEANUP(EVP_PKEY_get_params(pStoreCtx->pEVPPkey, params_tmp) == 1);
-            pubExponentLen      = params_tmp[0].return_size;
+            pubExponentLen = params_tmp[0].return_size;
             params[i++]    = OSSL_PARAM_construct_BN(OSSL_PKEY_PARAM_RSA_E, pubExponent, pubExponentLen);
         }
 
@@ -329,8 +501,9 @@ static int sss_rsa_keymgmt_export(void *keydata, int selection, OSSL_CALLBACK *p
                 }
             }
 
-            params[i++] = OSSL_PARAM_construct_BN(OSSL_PKEY_PARAM_RSA_N, modulus, modLen);             /* Modulus */
-            params[i++] = OSSL_PARAM_construct_BN(OSSL_PKEY_PARAM_RSA_E, pubExponent, pubExponentLen); /* Public Exponent */
+            params[i++] = OSSL_PARAM_construct_BN(OSSL_PKEY_PARAM_RSA_N, modulus, modLen); /* Modulus */
+            params[i++] =
+                OSSL_PARAM_construct_BN(OSSL_PKEY_PARAM_RSA_E, pubExponent, pubExponentLen); /* Public Exponent */
         }
 
         if (selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) {
@@ -390,7 +563,7 @@ static void *sss_rsa_keymgmt_gen_init(void *provctx, int selection, const OSSL_P
         return NULL;
     }
 
-    pStoreCtx->isFile   = 0;
+    pStoreCtx->isEVPKey = 0;
     pStoreCtx->pProvCtx = provctx;
     return pStoreCtx;
 }
@@ -399,9 +572,10 @@ static int sss_keymgmt_rsa_gen_set_params(void *keydata, const OSSL_PARAM params
 {
     sss_provider_store_obj_t *pStoreCtx = (sss_provider_store_obj_t *)keydata;
     const OSSL_PARAM *p;
-    int ret   = 0;
-    int bits  = 0;
-    int index = 0;
+    int ret          = 0;
+    int bits         = 0;
+    int index        = 0;
+    uint32_t factor2 = 0;
 
     sssProv_Print(LOG_DBG_ON, "Enter - %s \n", __FUNCTION__);
 
@@ -426,6 +600,14 @@ static int sss_keymgmt_rsa_gen_set_params(void *keydata, const OSSL_PARAM params
         }
     }
 
+    p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_RSA_FACTOR2);
+    if (p != NULL) {
+        if (!OSSL_PARAM_get_uint32(p, &factor2)) {
+            goto cleanup;
+        }
+        pStoreCtx->keyid = factor2;
+    }
+
 #if 0
     p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_RSA_E);
     if (p != NULL) {
@@ -444,6 +626,7 @@ static const OSSL_PARAM *sss_keymgmt_rsa_gen_settable_params(void *keydata, void
     static OSSL_PARAM settable[] = {OSSL_PARAM_size_t(OSSL_PKEY_PARAM_RSA_BITS, NULL),
         OSSL_PARAM_size_t(OSSL_PKEY_PARAM_RSA_PRIMES, NULL),
         OSSL_PARAM_BN(OSSL_PKEY_PARAM_RSA_E, NULL, 0),
+        OSSL_PARAM_BN(OSSL_PKEY_PARAM_RSA_FACTOR2, NULL, 0),
         OSSL_PARAM_END};
     sssProv_Print(LOG_DBG_ON, "Enter - %s \n", __FUNCTION__);
     (void)(keydata);
@@ -493,6 +676,7 @@ static void *sss_keymgmt_rsa_gen(void *keydata, OSSL_CALLBACK *osslcb, void *cba
     ENSURE_OR_GO_CLEANUP(status == kStatus_SSS_Success);
 
     sssProv_Print(LOG_FLOW_ON, "Generate RSA key inside SE05x \n");
+    sssProv_Print(LOG_FLOW_ON, "NOTE: Key is created with Persistent Option \n");
     sssProv_Print(LOG_DBG_ON, "(At key id 0x%X from SE05x) \n", pStoreCtx->keyid);
     status = sss_key_store_generate_key(
         &pStoreCtx->pProvCtx->p_ex_sss_boot_ctx->ks, &pStoreCtx->object, (pStoreCtx->key_len * 8), 0);
@@ -510,14 +694,58 @@ static void sss_keymgmt_rsa_gen_cleanup(void *keydata)
     return;
 }
 
+static void *sss_rsa_keymgmt_dup(const void *keydata, int selection)
+{
+    sss_provider_store_obj_t *pStoreCtx   = (sss_provider_store_obj_t *)keydata;
+    sss_provider_store_obj_t *outStoreCtx = NULL;
+
+    sssProv_Print(LOG_DBG_ON, "Enter - %s \n", __FUNCTION__);
+
+    (void)(selection);
+
+    outStoreCtx = OPENSSL_zalloc(sizeof(sss_provider_store_obj_t));
+    if (outStoreCtx == NULL) {
+        return NULL;
+    }
+
+    if (pStoreCtx != NULL) {
+        outStoreCtx->keyid        = pStoreCtx->keyid;
+        outStoreCtx->key_len      = pStoreCtx->key_len;
+        outStoreCtx->maxSize      = pStoreCtx->maxSize;
+        outStoreCtx->isPrivateKey = pStoreCtx->isPrivateKey;
+        outStoreCtx->isEVPKey     = pStoreCtx->isEVPKey;
+
+        memcpy(&(outStoreCtx->object), &(pStoreCtx->object), sizeof(pStoreCtx->object));
+        outStoreCtx->pProvCtx = pStoreCtx->pProvCtx;
+
+        if (pStoreCtx->pEVPPkey != NULL) {
+            outStoreCtx->pEVPPkey = EVP_PKEY_dup(pStoreCtx->pEVPPkey);
+        }
+
+        return outStoreCtx;
+    }
+    else {
+        OPENSSL_free(outStoreCtx);
+        return NULL;
+    }
+}
+
 const OSSL_DISPATCH sss_rsa_keymgmt_dispatch[] = {{OSSL_FUNC_KEYMGMT_LOAD, (void (*)(void))sss_rsa_keymgmt_load},
+#ifdef SSS_ENABLE_RSA_KEYMGMT_IMPORT_FUNC
+    {OSSL_FUNC_KEYMGMT_NEW, (void (*)(void))sss_rsa_keymgmt_new},
+#endif /*SSS_ENABLE_RSA_KEYMGMT_IMPORT_FUNC*/
     {OSSL_FUNC_KEYMGMT_FREE, (void (*)(void))sss_rsa_keymgmt_free},
     {OSSL_FUNC_KEYMGMT_GET_PARAMS, (void (*)(void))sss_rsa_keymgmt_get_params},
     {OSSL_FUNC_KEYMGMT_GETTABLE_PARAMS, (void (*)(void))sss_rsa_keymgmt_gettable_params},
     {OSSL_FUNC_KEYMGMT_QUERY_OPERATION_NAME, (void (*)(void))sss_rsa_keymgmt_query_operation_name},
     {OSSL_FUNC_KEYMGMT_HAS, (void (*)(void))sss_rsa_keymgmt_has},
+#ifdef SSS_ENABLE_RSA_KEYMGMT_IMPORT_FUNC
+    {OSSL_FUNC_KEYMGMT_IMPORT, (void (*)(void))sss_rsa_keymgmt_import},
+    {OSSL_FUNC_KEYMGMT_IMPORT_TYPES, (void (*)(void))sss_rsa_keymgmt_import_types},
+#endif /*SSS_ENABLE_RSA_KEYMGMT_IMPORT_FUNC*/
     {OSSL_FUNC_KEYMGMT_EXPORT, (void (*)(void))sss_rsa_keymgmt_export},
     {OSSL_FUNC_KEYMGMT_EXPORT_TYPES, (void (*)(void))sss_rsa_keymgmt_export_types},
+    {OSSL_FUNC_KEYMGMT_DUP, (void (*)(void))sss_rsa_keymgmt_dup},
 
     /* To generate the key in SE */
     {OSSL_FUNC_KEYMGMT_GEN_INIT, (void (*)(void))sss_rsa_keymgmt_gen_init},
