@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.1.1]
+
+- Bug fix: Signature length calculation fixed in ECDSA functions.
+
 ## [1.1.0]
 
 - CSR generation extended for all SHA algorithms now. (Get context functions - 'sss_rsa_signature_get_ctx_params' and 'sss_ecdsa_signature_get_ctx_params' updated to handle all SHA algorithms).

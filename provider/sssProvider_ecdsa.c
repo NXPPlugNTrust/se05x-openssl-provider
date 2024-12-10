@@ -158,7 +158,12 @@ static int sss_ecdsa_signature_sign(
         ENSURE_OR_GO_CLEANUP(pEcdsaCtx->pProvCtx->p_ex_sss_boot_ctx != NULL);
 
         if (sig == NULL) {
-            *siglen = (((pEcdsaCtx->pStoreObjCtx->key_len) * 2) + 10);
+            if ((pEcdsaCtx->pStoreObjCtx->object.cipherType == kSSS_CipherType_EC_BRAINPOOL) && (pEcdsaCtx->pStoreObjCtx->key_len == 64)) {
+                *siglen = (((pEcdsaCtx->pStoreObjCtx->key_len) * 2) + 9);
+            }
+            else {
+                *siglen = (((pEcdsaCtx->pStoreObjCtx->key_len) * 2) + 8);
+            }
             return 1;
         }
         else {
@@ -390,7 +395,12 @@ static int sss_ecdsa_signature_digest_sign_final(void *ctx, unsigned char *sig, 
         ENSURE_OR_GO_CLEANUP(pEcdsaCtx->pProvCtx->p_ex_sss_boot_ctx != NULL);
 
         if (sig == NULL) {
-            *siglen = (((pEcdsaCtx->pStoreObjCtx->key_len) * 2) + 10);
+            if ((pEcdsaCtx->pStoreObjCtx->object.cipherType == kSSS_CipherType_EC_BRAINPOOL) && (pEcdsaCtx->pStoreObjCtx->key_len == 64)) {
+                *siglen = (((pEcdsaCtx->pStoreObjCtx->key_len) * 2) + 9);
+            }
+            else {
+                *siglen = (((pEcdsaCtx->pStoreObjCtx->key_len) * 2) + 8);
+            }
             return 1;
         }
         else {
@@ -522,7 +532,12 @@ static int sss_ecdsa_signature_digest_sign(
         ENSURE_OR_GO_CLEANUP(pEcdsaCtx->pProvCtx->p_ex_sss_boot_ctx != NULL);
 
         if (sig == NULL) {
-            *siglen = (((pEcdsaCtx->pStoreObjCtx->key_len) * 2) + 10);
+            if ((pEcdsaCtx->pStoreObjCtx->object.cipherType == kSSS_CipherType_EC_BRAINPOOL) && (pEcdsaCtx->pStoreObjCtx->key_len == 64)) {
+                *siglen = (((pEcdsaCtx->pStoreObjCtx->key_len) * 2) + 9);
+            }
+            else {
+                *siglen = (((pEcdsaCtx->pStoreObjCtx->key_len) * 2) + 8);
+            }
             return 1;
         }
         else {

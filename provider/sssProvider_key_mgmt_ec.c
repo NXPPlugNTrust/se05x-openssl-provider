@@ -306,8 +306,17 @@ static int sss_ec_keymgmt_get_params(void *keydata, OSSL_PARAM params[])
         }
 
         p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_MAX_SIZE);
-        if ((p != NULL) && (!OSSL_PARAM_set_int(p, (((pStoreCtx->key_len) * 2) + 8)))) { /* Signature size */
-            goto cleanup;
+        if (p != NULL) {
+            if ((pStoreCtx->object.cipherType == kSSS_CipherType_EC_BRAINPOOL) && (pStoreCtx->key_len == 64)) {
+                if (!OSSL_PARAM_set_int(p, (((pStoreCtx->key_len) * 2) + 9))) { /* Signature size */
+                    goto cleanup;
+                }
+            }
+            else {
+                if (!OSSL_PARAM_set_int(p, (((pStoreCtx->key_len) * 2) + 8))) { /* Signature size */
+                    goto cleanup;
+                }
+            }
         }
 
         p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_PUB_KEY);
