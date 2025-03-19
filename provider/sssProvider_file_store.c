@@ -4,7 +4,7 @@
  * @version 1.0
  * @par License
  *
- * Copyright 2022,2024 NXP
+ * Copyright 2022,2024-2025 NXP
  * SPDX-License-Identifier: Apache-2.0
  *
  * @par Description
@@ -20,6 +20,7 @@
 #include <openssl/core_object.h>
 #include <openssl/pem.h>
 #include <openssl/store.h>
+#include <string.h>
 
 /* ********************** Public funtions ******************* */
 

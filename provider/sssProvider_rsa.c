@@ -337,7 +337,7 @@ static int sss_rsa_signature_digest_update(void *ctx, const unsigned char *data,
         ENSURE_OR_GO_CLEANUP(status == kStatus_SSS_Success);
 
         datalenTmp = datalenTmp - templen;
-        ENSURE_OR_GO_CLEANUP((UINT_MAX - offset) >= templen);
+        ENSURE_OR_GO_CLEANUP((SIZE_MAX - offset) >= templen);
         offset = offset + templen;
     }
 
@@ -530,7 +530,7 @@ static int sss_rsa_signature_digest_sign(
                 ENSURE_OR_GO_CLEANUP(status == kStatus_SSS_Success);
 
                 datalenTmp = datalenTmp - templen;
-                ENSURE_OR_GO_CLEANUP((UINT_MAX - offset) >= templen);
+                ENSURE_OR_GO_CLEANUP((SIZE_MAX - offset) >= templen);
                 offset = offset + templen;
             }
 
@@ -630,7 +630,7 @@ static int sss_rsa_signature_digest_sign(
                 ENSURE_OR_GO_CLEANUP(status == kStatus_SSS_Success);
 
                 datalenTmp = datalenTmp - templen;
-                ENSURE_OR_GO_CLEANUP((UINT_MAX - offset) >= templen);
+                ENSURE_OR_GO_CLEANUP((SIZE_MAX - offset) >= templen);
                 offset = offset + templen;
             }
 
@@ -895,7 +895,7 @@ static int sss_rsa_signature_digest_verify(
             ENSURE_OR_GO_CLEANUP(status == kStatus_SSS_Success);
 
             datalenTmp = datalenTmp - templen;
-            ENSURE_OR_GO_CLEANUP((UINT_MAX - offset) >= templen);
+            ENSURE_OR_GO_CLEANUP((SIZE_MAX - offset) >= templen);
             offset = offset + templen;
         }
 
@@ -982,7 +982,7 @@ static int sss_rsa_signature_digest_verify(
             ENSURE_OR_GO_CLEANUP(status == kStatus_SSS_Success);
 
             datalenTmp = datalenTmp - templen;
-            ENSURE_OR_GO_CLEANUP((UINT_MAX - offset) >= templen);
+            ENSURE_OR_GO_CLEANUP((SIZE_MAX - offset) >= templen);
             offset = offset + templen;
         }
 

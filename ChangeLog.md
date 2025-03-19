@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.2]
+- ECDSA functions handle different formats of SHA algorithm string (Example - "sha256" / "SHA256" / "SHA2-256")
+
+- Fixes for static analysis findings.
+
 ## [1.1.1]
 
 - Bug fix: Signature length calculation fixed in ECDSA functions.

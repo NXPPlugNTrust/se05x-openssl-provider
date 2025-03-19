@@ -1,7 +1,7 @@
 
 /*
  * Copyright 2019-2021 The OpenSSL Project Authors. All Rights Reserved.
- * Copyright 2022-2024 NXP
+ * Copyright 2022-2025 NXP
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -38,7 +38,7 @@
 
 /* ********************** Constants ************************** */
 #define SSS_PROVIDER_NAME "NXP Provider"
-#define SSS_PROVIDER_VERSION "1.1.1"
+#define SSS_PROVIDER_VERSION "1.1.2"
 #define SSSPROV_MAX_PRINT_BUF_SIZE (511)
 
 /* ********************** Global variables ************************** */
@@ -264,6 +264,12 @@ cleanup:
     return 0;
 }
 
+OPENSSL_EXPORT int sssProvider_init(
+    const OSSL_CORE_HANDLE *handle, const OSSL_DISPATCH *in, const OSSL_DISPATCH **out, void **provctx)
+{
+    return OSSL_provider_init(handle, in, out, provctx);
+}
+
 void sssProv_Print(int flag, const char *format, ...)
 {
     unsigned char buffer[SSSPROV_MAX_PRINT_BUF_SIZE + 1];
@@ -285,7 +291,10 @@ void sssProv_Print(int flag, const char *format, ...)
 
     if (active == 1) {
         va_start(vArgs, format);
-        vsnprintf((char *)buffer, SSSPROV_MAX_PRINT_BUF_SIZE, (char const *)format, vArgs);
+        if (vsnprintf((char *)buffer, SSSPROV_MAX_PRINT_BUF_SIZE, (char const *)format, vArgs) < 0) {
+            printf("vsnprintf error");
+            return;
+        }
         va_end(vArgs);
         printf("%s", buffer);
     }

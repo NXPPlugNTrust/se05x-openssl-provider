@@ -4,7 +4,7 @@
  * @version 1.0
  * @par License
  *
- * Copyright 2022,2024 NXP
+ * Copyright 2022,2024,2025 NXP
  * SPDX-License-Identifier: Apache-2.0
  *
  * @par Description
@@ -113,6 +113,8 @@ static int sss_rsa_keymgmt_get_params(void *keydata, OSSL_PARAM params[])
     sss_se05x_session_t *pSession       = (sss_se05x_session_t *)&pStoreCtx->pProvCtx->p_ex_sss_boot_ctx->session;
     OSSL_PARAM *p;
     int ret                 = 0;
+    int pkey_bits           = 0;
+    int pkey_security_bits  = 0;
     uint8_t public_key[550] = {0};
     size_t public_key_len   = sizeof(public_key);
     size_t pbKeyBitLen      = sizeof(public_key) * 8;
@@ -134,16 +136,23 @@ static int sss_rsa_keymgmt_get_params(void *keydata, OSSL_PARAM params[])
     for almost all operations that can be done with pkey */
         pStoreCtx->maxSize = EVP_PKEY_size(pStoreCtx->pEVPPkey);
 
+        pkey_bits = EVP_PKEY_bits(pStoreCtx->pEVPPkey);
+        ENSURE_OR_GO_CLEANUP(pkey_bits > 0);
+
         p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_BITS);
-        if (p != NULL && !OSSL_PARAM_set_int(p, EVP_PKEY_bits(pStoreCtx->pEVPPkey))) {
+        if (p != NULL && !OSSL_PARAM_set_int(p, pkey_bits)) {
             goto cleanup;
         }
         p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_MAX_SIZE);
         if (p != NULL && !OSSL_PARAM_set_int(p, pStoreCtx->maxSize)) { /* Signature size */
             goto cleanup;
         }
+
+        pkey_security_bits = EVP_PKEY_security_bits(pStoreCtx->pEVPPkey);
+        ENSURE_OR_GO_CLEANUP(pkey_security_bits > 0);
+
         p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_SECURITY_BITS);
-        if (p != NULL && !OSSL_PARAM_set_int(p, EVP_PKEY_security_bits(pStoreCtx->pEVPPkey))) {
+        if (p != NULL && !OSSL_PARAM_set_int(p, pkey_security_bits)) {
             goto cleanup;
         }
     }
@@ -363,7 +372,7 @@ static int sss_rsa_keymgmt_import(void *keydata, int selection, OSSL_PARAM param
             n_len = BN_num_bytes(bn_n);
             ENSURE_OR_GO_CLEANUP(n_len != 0);
 
-            pStoreCtx->key_len = n_len;
+            pStoreCtx->key_len = (uint16_t)n_len;
             ENSURE_OR_GO_CLEANUP(pStoreCtx->key_len != 0);
 
             if (magic_num != RSA_SIGNATURE_REFKEY_ID) {

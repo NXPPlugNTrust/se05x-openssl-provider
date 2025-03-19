@@ -4,7 +4,7 @@
  * @version 1.0
  * @par License
  *
- * Copyright 2022,2024 NXP
+ * Copyright 2022,2024-2025 NXP
  * SPDX-License-Identifier: Apache-2.0
  *
  */
@@ -175,6 +175,9 @@ typedef struct
 } sss_provider_store_obj_t;
 
 /* ********************** Function Prototypes **************** */
+
+OPENSSL_EXPORT int sssProvider_init(
+    const OSSL_CORE_HANDLE *handle, const OSSL_DISPATCH *in, const OSSL_DISPATCH **out, void **provctx);
 
 void sssProv_Print(int flag, const char *format, ...);
 

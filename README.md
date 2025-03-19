@@ -19,7 +19,7 @@ the following functionality can be made available over the OpenSSL provider here
   - CSR
 - Random generator
 
-The OpenSSL provider is compatible with OpenSSL versions 3.0.x
+The OpenSSL provider is compatible with OpenSSL versions 3.x
 
 OpenSSL provider is tested on i.MX (imx8mqevk, with yocto), Raspberry Pi (Raspberry Pi 4 Model B, Ubuntu 22.04.2 LTS)
 
@@ -30,7 +30,7 @@ OpenSSL provider is tested on i.MX (imx8mqevk, with yocto), Raspberry Pi (Raspbe
 
 - Raspberry pi with Ubuntu 22.04.2 LTS installed
 - cmake installed - sudo apt-get install cmake
-- OpenSSL 3.0.x installed
+- OpenSSL 3.x installed
 - SE05x secure element connected to Raspberry Pi on i2c-0 port
 
 <p align=left>

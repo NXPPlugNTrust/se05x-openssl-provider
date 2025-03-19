@@ -4,7 +4,7 @@
  * @version 1.0
  * @par License
  *
- * Copyright 2022,2024 NXP
+ * Copyright 2022,2024-2025 NXP
  * SPDX-License-Identifier: Apache-2.0
  *
  * @par Description
@@ -158,7 +158,8 @@ static int sss_ecdsa_signature_sign(
         ENSURE_OR_GO_CLEANUP(pEcdsaCtx->pProvCtx->p_ex_sss_boot_ctx != NULL);
 
         if (sig == NULL) {
-            if ((pEcdsaCtx->pStoreObjCtx->object.cipherType == kSSS_CipherType_EC_BRAINPOOL) && (pEcdsaCtx->pStoreObjCtx->key_len == 64)) {
+            if ((pEcdsaCtx->pStoreObjCtx->object.cipherType == kSSS_CipherType_EC_BRAINPOOL) &&
+                (pEcdsaCtx->pStoreObjCtx->key_len == 64)) {
                 *siglen = (((pEcdsaCtx->pStoreObjCtx->key_len) * 2) + 9);
             }
             else {
@@ -341,7 +342,7 @@ static int sss_ecdsa_signature_digest_update(void *ctx, const unsigned char *dat
     int ret                              = 0;
 
     sssProv_Print(LOG_DBG_ON, "Enter - %s \n", __FUNCTION__);
-    sssProv_Print(LOG_DBG_ON, "Input data length = %d \n", datalen);
+    sssProv_Print(LOG_DBG_ON, "Input data length = %zu \n", datalen);
 
     ENSURE_OR_GO_CLEANUP(data != NULL);
     ENSURE_OR_GO_CLEANUP(pEcdsaCtx != NULL);
@@ -361,7 +362,7 @@ static int sss_ecdsa_signature_digest_update(void *ctx, const unsigned char *dat
         ENSURE_OR_GO_CLEANUP(status == kStatus_SSS_Success);
 
         datalen = datalen - templen;
-        ENSURE_OR_GO_CLEANUP((UINT_MAX - offset) >= templen);
+        ENSURE_OR_GO_CLEANUP((SIZE_MAX - offset) >= templen);
         offset = offset + templen;
     }
 
@@ -395,7 +396,8 @@ static int sss_ecdsa_signature_digest_sign_final(void *ctx, unsigned char *sig, 
         ENSURE_OR_GO_CLEANUP(pEcdsaCtx->pProvCtx->p_ex_sss_boot_ctx != NULL);
 
         if (sig == NULL) {
-            if ((pEcdsaCtx->pStoreObjCtx->object.cipherType == kSSS_CipherType_EC_BRAINPOOL) && (pEcdsaCtx->pStoreObjCtx->key_len == 64)) {
+            if ((pEcdsaCtx->pStoreObjCtx->object.cipherType == kSSS_CipherType_EC_BRAINPOOL) &&
+                (pEcdsaCtx->pStoreObjCtx->key_len == 64)) {
                 *siglen = (((pEcdsaCtx->pStoreObjCtx->key_len) * 2) + 9);
             }
             else {
@@ -532,7 +534,8 @@ static int sss_ecdsa_signature_digest_sign(
         ENSURE_OR_GO_CLEANUP(pEcdsaCtx->pProvCtx->p_ex_sss_boot_ctx != NULL);
 
         if (sig == NULL) {
-            if ((pEcdsaCtx->pStoreObjCtx->object.cipherType == kSSS_CipherType_EC_BRAINPOOL) && (pEcdsaCtx->pStoreObjCtx->key_len == 64)) {
+            if ((pEcdsaCtx->pStoreObjCtx->object.cipherType == kSSS_CipherType_EC_BRAINPOOL) &&
+                (pEcdsaCtx->pStoreObjCtx->key_len == 64)) {
                 *siglen = (((pEcdsaCtx->pStoreObjCtx->key_len) * 2) + 9);
             }
             else {
@@ -565,7 +568,7 @@ static int sss_ecdsa_signature_digest_sign(
                 ENSURE_OR_GO_CLEANUP(status == kStatus_SSS_Success);
 
                 datalenTmp = datalenTmp - templen;
-                ENSURE_OR_GO_CLEANUP((UINT_MAX - offset) >= templen);
+                ENSURE_OR_GO_CLEANUP((SIZE_MAX - offset) >= templen);
                 offset = offset + templen;
             }
 
@@ -665,7 +668,7 @@ static int sss_ecdsa_signature_digest_sign(
                 ENSURE_OR_GO_CLEANUP(status == kStatus_SSS_Success);
 
                 datalenTmp = datalenTmp - templen;
-                ENSURE_OR_GO_CLEANUP((UINT_MAX - offset) >= templen);
+                ENSURE_OR_GO_CLEANUP((SIZE_MAX - offset) >= templen);
                 offset = offset + templen;
             }
 
@@ -958,7 +961,7 @@ static int sss_ecdsa_signature_digest_verify(
             ENSURE_OR_GO_CLEANUP(status == kStatus_SSS_Success);
 
             datalenTmp = datalenTmp - templen;
-            ENSURE_OR_GO_CLEANUP((UINT_MAX - offset) >= templen);
+            ENSURE_OR_GO_CLEANUP((SIZE_MAX - offset) >= templen);
             offset = offset + templen;
         }
 
@@ -1047,7 +1050,7 @@ static int sss_ecdsa_signature_digest_verify(
             ENSURE_OR_GO_CLEANUP(status == kStatus_SSS_Success);
 
             datalenTmp = datalenTmp - templen;
-            ENSURE_OR_GO_CLEANUP((UINT_MAX - offset) >= templen);
+            ENSURE_OR_GO_CLEANUP((SIZE_MAX - offset) >= templen);
             offset = offset + templen;
         }
 
@@ -1209,19 +1212,24 @@ static int sss_ecdsa_set_ctx_params(void *ctx, const OSSL_PARAM params[])
             if (p->data == NULL) {
                 return 0;
             }
-            if (strcmp(p->data, "SHA1") == 0) {
+            if ((0 == SSS_CMP_STR(p->data, "sha1")) || (0 == SSS_CMP_STR(p->data, "SHA1")) ||
+                (0 == SSS_CMP_STR(p->data, "SHA-1"))) {
                 pEcdsaCtx->sha_algorithm = kAlgorithm_SSS_SHA1;
             }
-            else if (strcmp(p->data, "SHA224") == 0) {
+            else if ((0 == SSS_CMP_STR(p->data, "sha224")) || (0 == SSS_CMP_STR(p->data, "SHA224")) ||
+                     (0 == SSS_CMP_STR(p->data, "SHA2-224"))) {
                 pEcdsaCtx->sha_algorithm = kAlgorithm_SSS_SHA224;
             }
-            else if (strcmp(p->data, "SHA256") == 0) {
+            else if ((0 == SSS_CMP_STR(p->data, "sha256")) || (0 == SSS_CMP_STR(p->data, "SHA256")) ||
+                     (0 == SSS_CMP_STR(p->data, "SHA2-256"))) {
                 pEcdsaCtx->sha_algorithm = kAlgorithm_SSS_SHA256;
             }
-            else if (strcmp(p->data, "SHA384") == 0) {
+            else if ((0 == SSS_CMP_STR(p->data, "sha384")) || (0 == SSS_CMP_STR(p->data, "SHA384")) ||
+                     (0 == SSS_CMP_STR(p->data, "SHA2-384"))) {
                 pEcdsaCtx->sha_algorithm = kAlgorithm_SSS_SHA384;
             }
-            else if (strcmp(p->data, "SHA512") == 0) {
+            else if ((0 == SSS_CMP_STR(p->data, "sha512")) || (0 == SSS_CMP_STR(p->data, "SHA512")) ||
+                     (0 == SSS_CMP_STR(p->data, "SHA2-512"))) {
                 pEcdsaCtx->sha_algorithm = kAlgorithm_SSS_SHA512;
             }
             else {

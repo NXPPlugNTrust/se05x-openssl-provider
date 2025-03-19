@@ -4,7 +4,7 @@
  * @version 1.0
  * @par License
  *
- * Copyright 2022,2024 NXP
+ * Copyright 2022,2024,2025 NXP
  * SPDX-License-Identifier: Apache-2.0
  *
  * @par Description
@@ -202,6 +202,8 @@ static int sss_ec_keymgmt_get_params(void *keydata, OSSL_PARAM params[])
     OSSL_PARAM *p                           = NULL;
     int ret                                 = 0;
     int keylen_bits                         = 0;
+    int pkey_bits                           = 0;
+    int pkey_security_bits                  = 0;
     smStatus_t sm_status                    = SM_NOT_OK;
     uint8_t public_key[256]                 = {0};
     size_t public_key_len                   = sizeof(public_key);
@@ -228,8 +230,11 @@ static int sss_ec_keymgmt_get_params(void *keydata, OSSL_PARAM params[])
     for almost all operations that can be done with pkey */
         pStoreCtx->maxSize = EVP_PKEY_size(pStoreCtx->pEVPPkey);
 
+        pkey_bits = EVP_PKEY_bits(pStoreCtx->pEVPPkey);
+        ENSURE_OR_GO_CLEANUP(pkey_bits > 0);
+
         p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_BITS);
-        if (p != NULL && !OSSL_PARAM_set_int(p, EVP_PKEY_bits(pStoreCtx->pEVPPkey))) {
+        if (p != NULL && !OSSL_PARAM_set_int(p, pkey_bits)) {
             goto cleanup;
         }
         p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_MAX_SIZE);
@@ -241,8 +246,11 @@ static int sss_ec_keymgmt_get_params(void *keydata, OSSL_PARAM params[])
             goto cleanup;
         }
 
+        pkey_security_bits = EVP_PKEY_security_bits(pStoreCtx->pEVPPkey);
+        ENSURE_OR_GO_CLEANUP(pkey_security_bits > 0);
+
         p = OSSL_PARAM_locate(params, OSSL_PKEY_PARAM_SECURITY_BITS);
-        if (p != NULL && !OSSL_PARAM_set_int(p, EVP_PKEY_security_bits(pStoreCtx->pEVPPkey))) {
+        if (p != NULL && !OSSL_PARAM_set_int(p, pkey_security_bits)) {
             goto cleanup;
         }
 
@@ -369,7 +377,7 @@ static int sss_ec_keymgmt_get_params(void *keydata, OSSL_PARAM params[])
 
                 if (public_key_len <= sizeof(pStoreCtx->pub_key)) {
                     memcpy(pStoreCtx->pub_key, public_key, public_key_len);
-                    pStoreCtx->pub_key_len = public_key_len;
+                    pStoreCtx->pub_key_len = (uint8_t)public_key_len;
                 }
             }
 
@@ -555,7 +563,7 @@ static int sss_ec_keymgmt_import(void *keydata, int selection, OSSL_PARAM params
             res = BN_bn2bin(bn_priv_key, priv_key_data);
             ENSURE_OR_GO_CLEANUP(res == (int)priv_key_data_len);
 
-            pStoreCtx->key_len = priv_key_data_len;
+            pStoreCtx->key_len = (uint16_t)priv_key_data_len;
 
             ENSURE_OR_GO_CLEANUP(priv_key_data_len >= 14);
 
@@ -686,7 +694,7 @@ static int sss_ec_keymgmt_export(void *keydata, int selection, OSSL_CALLBACK *pa
                 /* Store public key on host */
                 if (public_key_len <= sizeof(pStoreCtx->pub_key)) {
                     memcpy(pStoreCtx->pub_key, public_key, public_key_len);
-                    pStoreCtx->pub_key_len = public_key_len;
+                    pStoreCtx->pub_key_len = (uint8_t)public_key_len;
                 }
             }
             else {
@@ -1025,7 +1033,7 @@ static int sss_ec_keymgmt_match(const void *keydata1, const void *keydata2, int 
                 &pSession->s_ctx, se_pStoreCtx->object.keyId, 0, 0, se_pStoreCtx->pub_key, &se_public_key_len);
             ENSURE_OR_GO_CLEANUP(sm_status == SM_OK);
 
-            se_pStoreCtx->pub_key_len = se_public_key_len;
+            se_pStoreCtx->pub_key_len = (uint8_t)se_public_key_len;
         }
 
         evp_public_key_len = EVP_PKEY_get1_encoded_public_key(host_evp_pkey, &evp_public_key_buf);
@@ -1053,7 +1061,7 @@ static int sss_ec_keymgmt_match(const void *keydata1, const void *keydata2, int 
             sm_status                = Se05x_API_ReadObject(
                 &pSession->s_ctx, pStoreCtx1->object.keyId, 0, 0, pStoreCtx1->pub_key, &se_public_key_len);
             ENSURE_OR_GO_CLEANUP(sm_status == SM_OK);
-            pStoreCtx1->pub_key_len = se_public_key_len;
+            pStoreCtx1->pub_key_len = (uint8_t)se_public_key_len;
         }
 
         if (pStoreCtx2->pub_key_len == 0) {
@@ -1061,7 +1069,7 @@ static int sss_ec_keymgmt_match(const void *keydata1, const void *keydata2, int 
             sm_status                = Se05x_API_ReadObject(
                 &pSession->s_ctx, pStoreCtx2->object.keyId, 0, 0, pStoreCtx2->pub_key, &se_public_key_len);
             ENSURE_OR_GO_CLEANUP(sm_status == SM_OK);
-            pStoreCtx2->pub_key_len = se_public_key_len;
+            pStoreCtx2->pub_key_len = (uint8_t)se_public_key_len;
         }
 
         if (pStoreCtx1->pub_key_len != pStoreCtx2->pub_key_len) {

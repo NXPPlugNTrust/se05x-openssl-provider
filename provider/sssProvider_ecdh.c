@@ -4,7 +4,7 @@
  * @version 1.0
  * @par License
  *
- * Copyright 2022,2024 NXP
+ * Copyright 2022,2024,2025 NXP
  * SPDX-License-Identifier: Apache-2.0
  *
  * @par Description
@@ -158,7 +158,8 @@ static int sss_ecdh_keyexch_derive(void *ctx, unsigned char *secret, size_t *sec
             evpCtx = EVP_PKEY_CTX_new_from_pkey(NULL, pEcdhctx->pStoreObjCtx->pEVPPkey, "provider!=nxp_prov");
             ENSURE_OR_GO_CLEANUP(evpCtx != NULL);
 
-            EVP_PKEY_derive_init(evpCtx);
+            openssl_ret = EVP_PKEY_derive_init(evpCtx);
+            ENSURE_OR_GO_CLEANUP(openssl_ret == 1);
 
             openssl_ret = EVP_PKEY_derive_set_peer(evpCtx, pEcdhctx->pPeerEVPPkey);
             ENSURE_OR_GO_CLEANUP(openssl_ret == 1);
