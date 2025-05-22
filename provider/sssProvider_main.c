@@ -210,7 +210,6 @@ OPENSSL_EXPORT int OSSL_provider_init(
     sss_status_t status = kStatus_SSS_Fail;
     char *portName;
 
-    // Load default provider to use random generation during SCP03 connection
     // if (NULL == OSSL_PROVIDER_load(NULL, "default")) {
     //    sssProv_Print(LOG_FLOW_ON, "error in OSSL_PROVIDER_load \n");
     //}

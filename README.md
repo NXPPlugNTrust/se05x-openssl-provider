@@ -60,17 +60,7 @@ Refer ``CMAKE Options section`` in ``simw_lib\README.rst`` to build OpenSSL prov
 
 
 ```console
-NOTE: It is recommended to use access manager to establish PlatformSCP03 session to secure element.
-
-To establish platformSCP03 from sss provider, we have to load the default provider (required for crypto operations of SCP03) during sss provider initialisation code.
-Uncomment the below code in `sssProvider_main.c`.
-
-    //Load default provider to use random generation during SCP03 connection
-    //if (NULL == OSSL_PROVIDER_load(NULL, "default")) {
-    //    sssProv_Print(LOG_FLOW_ON, "error in OSSL_PROVIDER_load \n");
-    //}
-
-With this change, random number generation will not be offloaded to secure element.
+NOTE: It is mandatory to use access manager to establish PlatformSCP03 session to secure element.
 
 ```
 
