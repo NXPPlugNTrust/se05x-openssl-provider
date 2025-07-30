@@ -2,7 +2,7 @@
 
 NXP Software Content Register
 Release: se05x-openssl-provider.git
-Version: 01.01.02
+Version: 01.01.03
 Outgoing License: Apache-2.0
 License File: LICENSE.txt
 Description and comments: OpenSSL Provider for EdgeLock SE05x Secure Elements

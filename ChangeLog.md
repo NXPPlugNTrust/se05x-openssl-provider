@@ -1,5 +1,8 @@
 # Changelog
 
+## [1.1.3]
+- Key id parsing from curve parameter string is fixed to handle large key id numbers.
+
 ## [1.1.2]
 - ECDSA functions handle different formats of SHA algorithm string (Example - "sha256" / "SHA256" / "SHA2-256")
 

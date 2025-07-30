@@ -38,7 +38,7 @@
 
 /* ********************** Constants ************************** */
 #define SSS_PROVIDER_NAME "NXP Provider"
-#define SSS_PROVIDER_VERSION "1.1.2"
+#define SSS_PROVIDER_VERSION "1.1.3"
 #define SSSPROV_MAX_PRINT_BUF_SIZE (511)
 
 /* ********************** Global variables ************************** */

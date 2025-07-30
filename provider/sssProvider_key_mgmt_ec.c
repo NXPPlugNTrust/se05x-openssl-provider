@@ -777,7 +777,7 @@ static int sss_keymgmt_ec_gen_set_params(void *keydata, const OSSL_PARAM params[
     char *grp_name_tmp  = NULL;
     char *keyId_str     = NULL;
     int index           = 0;
-    long int strtol_ret = 0;
+    unsigned long int strtol_ret = 0;
 
     sssProv_Print(LOG_DBG_ON, "Enter - %s \n", __FUNCTION__);
 
@@ -801,8 +801,8 @@ static int sss_keymgmt_ec_gen_set_params(void *keydata, const OSSL_PARAM params[
         pStoreCtx->keyid = SSS_DEFAULT_EC_KEY_ID;
     }
     else {
-        strtol_ret = strtol(keyId_str, NULL, 0);
-        if ((strtol_ret > 0) && ((uint32_t)strtol_ret < UINT32_MAX)) {
+        strtol_ret = strtoul(keyId_str, NULL, 0);
+        if ((strtol_ret > 0) && (strtol_ret < UINT32_MAX)) {
             pStoreCtx->keyid = strtol_ret;
         }
         else {
