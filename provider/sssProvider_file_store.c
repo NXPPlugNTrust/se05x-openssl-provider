@@ -4,7 +4,7 @@
  * @version 1.0
  * @par License
  *
- * Copyright 2022,2024-2025 NXP
+ * Copyright 2022,2024-2025,2026 NXP
  * SPDX-License-Identifier: Apache-2.0
  *
  * @par Description
@@ -154,7 +154,7 @@ int sss_handle_rsa_ref_key(sss_provider_store_obj_t *pStoreCtx, EVP_PKEY *pEVPKe
     ENSURE_OR_GO_CLEANUP(openssl_ret == 1);
 
     ENSURE_OR_GO_CLEANUP(keyid <= UINT32_MAX);
-    pStoreCtx->keyid = keyid;
+    pStoreCtx->keyid = (uint32_t)keyid;
 
     if (pStoreCtx->isEVPKey) {
         ENSURE_OR_GO_CLEANUP(pStoreCtx->pProvCtx != NULL);

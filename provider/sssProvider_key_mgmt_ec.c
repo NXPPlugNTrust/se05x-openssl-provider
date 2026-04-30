@@ -4,7 +4,7 @@
  * @version 1.0
  * @par License
  *
- * Copyright 2022,2024,2025 NXP
+ * Copyright 2022,2024,2025,2026 NXP
  * SPDX-License-Identifier: Apache-2.0
  *
  * @par Description
@@ -333,7 +333,8 @@ static int sss_ec_keymgmt_get_params(void *keydata, OSSL_PARAM params[])
             sm_status =
                 Se05x_API_ReadObject(&pSession->s_ctx, pStoreCtx->object.keyId, 0, 0, public_key, &public_key_len);
             ENSURE_OR_GO_CLEANUP(sm_status == SM_OK);
-            bn_pub_key   = BN_bin2bn(public_key, public_key_len, NULL);
+            ENSURE_OR_GO_CLEANUP(public_key_len <= INT_MAX);
+            bn_pub_key   = BN_bin2bn(public_key, (int)public_key_len, NULL);
             p->data_size = public_key_len;
             if (!OSSL_PARAM_set_BN(p, bn_pub_key)) {
                 goto cleanup;

@@ -4,7 +4,7 @@
  * @version 1.0
  * @par License
  *
- * Copyright 2022,2024 NXP
+ * Copyright 2022,2024-2025 NXP
  * SPDX-License-Identifier: Apache-2.0
  *
  * @par Description
@@ -40,6 +40,7 @@ typedef struct
     sss_provider_store_obj_t *pStoreObjCtx;
     sss_provider_context_t *pProvCtx;
     sss_digest_t digestCtx;
+    uint8_t digestInit;
 } sss_provider_rsa_ctx_st;
 
 /* ********************** Private funtions ******************* */
@@ -306,9 +307,6 @@ static int sss_rsa_signature_digest_init(void *ctx, const char *mdname, void *pr
 #endif
     ENSURE_OR_GO_CLEANUP(status == kStatus_SSS_Success);
 
-    status = sss_digest_init(&pRsaCtx->digestCtx);
-    ENSURE_OR_GO_CLEANUP(status == kStatus_SSS_Success);
-
     ret = 1;
 cleanup:
     return ret;
@@ -329,6 +327,12 @@ static int sss_rsa_signature_digest_update(void *ctx, const unsigned char *data,
     ENSURE_OR_GO_CLEANUP(pRsaCtx != NULL);
     ENSURE_OR_GO_CLEANUP(pRsaCtx->pProvCtx != NULL);
     ENSURE_OR_GO_CLEANUP(pRsaCtx->pProvCtx->p_ex_sss_boot_ctx != NULL);
+
+    if (pRsaCtx->digestInit == 0) {
+        status = sss_digest_init(&pRsaCtx->digestCtx);
+        ENSURE_OR_GO_CLEANUP(status == kStatus_SSS_Success);
+        pRsaCtx->digestInit = 1;
+    }
 
     while (datalenTmp > 0) {
         templen = (datalenTmp > MAX_DIGEST_INPUT_DATA) ? MAX_DIGEST_INPUT_DATA : datalenTmp;

@@ -4,7 +4,7 @@
  * @version 1.0
  * @par License
  *
- * Copyright 2022,2024,2025 NXP
+ * Copyright 2022,2024,2025,2026 NXP
  * SPDX-License-Identifier: Apache-2.0
  *
  * @par Description
@@ -187,7 +187,8 @@ static int sss_rsa_keymgmt_get_params(void *keydata, OSSL_PARAM params[])
                 &public_key_len,
                 &pbKeyBitLen);
             ENSURE_OR_GO_CLEANUP(status == kStatus_SSS_Success);
-            bn_pub_key   = BN_bin2bn(public_key, public_key_len, NULL);
+            ENSURE_OR_GO_CLEANUP(public_key_len <= INT_MAX);
+            bn_pub_key   = BN_bin2bn(public_key, (int)public_key_len, NULL);
             p->data_size = public_key_len;
             if (!OSSL_PARAM_set_BN(p, bn_pub_key)) {
                 BN_free(bn_pub_key);
@@ -202,8 +203,8 @@ static int sss_rsa_keymgmt_get_params(void *keydata, OSSL_PARAM params[])
             smStatus     = Se05x_API_ReadRSA(
                 &pSession->s_ctx, pStoreCtx->object.keyId, 0, 0, kSE05x_RSAPubKeyComp_MOD, modulus, &modLen);
             ENSURE_OR_GO_CLEANUP(smStatus == SM_OK);
-
-            bn_n         = BN_bin2bn(modulus, modLen, NULL);
+            ENSURE_OR_GO_CLEANUP(modLen <= INT_MAX);
+            bn_n         = BN_bin2bn(modulus, (int32_t)modLen, NULL);
             p->data_size = modLen;
             if (!OSSL_PARAM_set_BN(p, bn_n)) {
                 BN_free(bn_n);
@@ -498,7 +499,7 @@ static int sss_rsa_keymgmt_export(void *keydata, int selection, OSSL_CALLBACK *p
             // reverse the moduluse
             {
                 int m       = 0;
-                int n       = modLen - 1;
+                int n       = (int)(modLen - 1);
                 uint8_t tmp = 0;
                 for (; m < n; m++, n--) {
                     if ((n < 0) || (n >= (int)sizeof(modulus))) {

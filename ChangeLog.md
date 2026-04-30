@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.4]
+- Memory leak issue fixed in RSA sign digest function (functions - 'sss_rsa_signature_digest_init').
+- simw_lib updated to v04.08.00
+- Fixes for static analysis findings.
+
 ## [1.1.3]
 - Key id parsing from curve parameter string is fixed to handle large key id numbers.
 

@@ -1,0 +1,89 @@
+{
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "spdxVersion": "SPDX-2.3",
+  "creationInfo": {
+    "created": "2026-04-24T04:48:48Z",
+    "creators": [
+      "Organization: NXP"
+    ],
+    "licenseListVersion": "3.26"
+  },
+  "name": "se05x-openssl-provider-v01.01.04",
+  "dataLicense": "CC0-1.0",
+  "documentNamespace": "https://nxp.com/spdx/308dfe63-ca50-4efc-9253-23102e181131",
+  "packages": [
+    {
+      "SPDXID": "SPDXRef-package-308dfe63-ca50-4efc-9253-23102e181131",
+      "name": "se05x-openssl-provider",
+      "versionInfo": "v01.01.04",
+      "licenseConcluded": "(Apache-2.0)",
+      "licenseDeclared": "(Apache-2.0)",
+      "downloadLocation": "https://github.com/NXPPlugNTrust/se05x-openssl-provider",
+      "originator": "Organization: NXP",
+      "supplier": "NOASSERTION",
+      "externalRefs": [],
+      "filesAnalyzed": false
+    },
+    {
+      "SPDXID": "SPDXRef-package-308dfe63-ca50-4efc-9253-23102e181131---8420f039-09f7-4a30-9cda-59128844008f",
+      "name": "OpenSSL",
+      "versionInfo": "3.5.4",
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "homepage": "https://www.openssl.org",
+      "downloadLocation": "NOASSERTION",
+      "originator": "Organization: openssl",
+      "supplier": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "OTHER",
+          "referenceLocator": "3c4e906e-e53e-4be8-b5f7-ee5a3cc73ab1",
+          "referenceType": "BlackDuck-ComponentOrigin"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceLocator": "cpe:2.3:a:debian_package:libssl-dev:3.5.4:1:*:*:*:*:*:*",
+          "referenceType": "cpe23Type"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceLocator": "cpe:2.3:a:debian_package:libssl-dev:3.5.4:1\\+b1:*:*:*:*:*:*",
+          "referenceType": "cpe23Type"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceLocator": "cpe:2.3:a:debian_package:libssl-dev:3.5.4:1\\~deb13u1:*:*:*:*:*:*",
+          "referenceType": "cpe23Type"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceLocator": "cpe:2.3:a:debian_package:libssl-dev:3.5.4:1\\~deb13u2:*:*:*:*:*:*",
+          "referenceType": "cpe23Type"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceLocator": "cpe:2.3:a:debian_package:libssl-doc:3.5.4:1:*:*:*:*:*:*",
+          "referenceType": "cpe23Type"
+        },
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:github/openssl/openssl@openssl-3.5.4",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false
+    }
+  ],
+  "relationships": [
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-package-308dfe63-ca50-4efc-9253-23102e181131"
+    },
+    {
+      "spdxElementId": "SPDXRef-package-308dfe63-ca50-4efc-9253-23102e181131",
+      "relationshipType": "DYNAMIC_LINK",
+      "relatedSpdxElement": "SPDXRef-package-308dfe63-ca50-4efc-9253-23102e181131---8420f039-09f7-4a30-9cda-59128844008f"
+    }
+  ]
+}
