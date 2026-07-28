@@ -129,7 +129,8 @@ static int sss_rand_enable_locking(void *ctx)
 static const OSSL_PARAM *sss_rand_gettable_ctx_params(void *ctx, void *provctx)
 {
     static const OSSL_PARAM known_gettable_ctx_params[] = {
-        OSSL_PARAM_size_t(OSSL_RAND_PARAM_MAX_REQUEST, NULL), OSSL_PARAM_END};
+        OSSL_PARAM_size_t(OSSL_RAND_PARAM_MAX_REQUEST, NULL),
+        OSSL_PARAM_int(OSSL_RAND_PARAM_STATE, NULL), OSSL_PARAM_END};
     sssProv_Print(LOG_DBG_ON, "Enter - %s \n", __FUNCTION__);
     (void)(ctx);
     (void)(provctx);
@@ -150,6 +151,11 @@ static int sss_rand_get_ctx_params(void *ctx, OSSL_PARAM params[])
 
     p = OSSL_PARAM_locate(params, OSSL_RAND_PARAM_MAX_REQUEST);
     if (p != NULL && !OSSL_PARAM_set_size_t(p, MAX_RND_REQUEST)) {
+        return 0;
+    }
+
+    p = OSSL_PARAM_locate(params, OSSL_RAND_PARAM_STATE);
+    if (p != NULL && !OSSL_PARAM_set_int(p, EVP_RAND_STATE_READY)) {
         return 0;
     }
 

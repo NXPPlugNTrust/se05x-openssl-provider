@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.1.5]
+- Context parameters of RNG extended with `OSSL_RAND_PARAM_STATE` parameter.
+- RSA and ECC Sign test scripts updated to use correct input file.
+
 ## [1.1.4]
 - Memory leak issue fixed in RSA sign digest function (functions - 'sss_rsa_signature_digest_init').
 - simw_lib updated to v04.08.00

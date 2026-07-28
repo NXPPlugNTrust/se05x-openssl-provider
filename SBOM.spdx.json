@@ -2,30 +2,30 @@
   "SPDXID": "SPDXRef-DOCUMENT",
   "spdxVersion": "SPDX-2.3",
   "creationInfo": {
-    "created": "2026-04-24T04:48:48Z",
+    "created": "2026-07-28T09:04:24Z",
     "creators": [
       "Organization: NXP"
     ],
-    "licenseListVersion": "3.26"
+    "licenseListVersion": "3.28"
   },
-  "name": "se05x-openssl-provider-v01.01.04",
+  "name": "se05x-openssl-provider-v01.01.05",
   "dataLicense": "CC0-1.0",
-  "documentNamespace": "https://nxp.com/spdx/308dfe63-ca50-4efc-9253-23102e181131",
+  "documentNamespace": "https://nxp.com/spdx/1c4987c2-706a-4433-aa60-097a2f35bd05",
   "packages": [
     {
-      "SPDXID": "SPDXRef-package-308dfe63-ca50-4efc-9253-23102e181131",
+      "SPDXID": "SPDXRef-package-1c4987c2-706a-4433-aa60-097a2f35bd05",
       "name": "se05x-openssl-provider",
-      "versionInfo": "v01.01.04",
+      "versionInfo": "v01.01.05",
       "licenseConcluded": "(Apache-2.0)",
       "licenseDeclared": "(Apache-2.0)",
-      "downloadLocation": "https://github.com/NXPPlugNTrust/se05x-openssl-provider",
+      "downloadLocation": "https://github.com/NXPPlugNTrust/se05x-openssl-provider -b main",
       "originator": "Organization: NXP",
       "supplier": "NOASSERTION",
       "externalRefs": [],
       "filesAnalyzed": false
     },
     {
-      "SPDXID": "SPDXRef-package-308dfe63-ca50-4efc-9253-23102e181131---8420f039-09f7-4a30-9cda-59128844008f",
+      "SPDXID": "SPDXRef-package-1c4987c2-706a-4433-aa60-097a2f35bd05---8420f039-09f7-4a30-9cda-59128844008f",
       "name": "OpenSSL",
       "versionInfo": "3.5.4",
       "licenseConcluded": "Apache-2.0",
@@ -78,12 +78,12 @@
     {
       "spdxElementId": "SPDXRef-DOCUMENT",
       "relationshipType": "DESCRIBES",
-      "relatedSpdxElement": "SPDXRef-package-308dfe63-ca50-4efc-9253-23102e181131"
+      "relatedSpdxElement": "SPDXRef-package-1c4987c2-706a-4433-aa60-097a2f35bd05"
     },
     {
-      "spdxElementId": "SPDXRef-package-308dfe63-ca50-4efc-9253-23102e181131",
+      "spdxElementId": "SPDXRef-package-1c4987c2-706a-4433-aa60-097a2f35bd05",
       "relationshipType": "DYNAMIC_LINK",
-      "relatedSpdxElement": "SPDXRef-package-308dfe63-ca50-4efc-9253-23102e181131---8420f039-09f7-4a30-9cda-59128844008f"
+      "relatedSpdxElement": "SPDXRef-package-1c4987c2-706a-4433-aa60-097a2f35bd05---8420f039-09f7-4a30-9cda-59128844008f"
     }
   ]
 }

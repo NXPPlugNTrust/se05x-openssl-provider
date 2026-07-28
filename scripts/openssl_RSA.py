@@ -34,7 +34,7 @@ def main():
 
         keyid_label = "nxp:0xEF000011"
         ref_rsa_key_0xEF000011 = output_keys_dir + os.sep + "rsa_ref_key_0xEF000011.pem"
-        input_data = cur_dir + os.sep + ".." + os.sep + "SCR.txt"
+        input_data = cur_dir + os.sep + ".." + os.sep + "CMakeLists.txt"
         signature = output_keys_dir + os.sep + "signature.bin"
 
 
