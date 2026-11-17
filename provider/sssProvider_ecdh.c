@@ -23,6 +23,7 @@
 /* ********************** Include files ********************** */
 #include "sssProvider_main.h"
 #include <string.h>
+#include <openssl/kdf.h>
 
 /* ********************** structure definition *************** */
 typedef struct
@@ -30,6 +31,11 @@ typedef struct
     EVP_PKEY *pPeerEVPPkey;
     sss_provider_store_obj_t *pStoreObjCtx; // Host key object
     sss_provider_context_t *pProvCtx;
+    int useX963KDF;
+    EVP_MD *kdfMd;
+    unsigned long kdfOutLen;
+    unsigned char *kdfUkm;
+    unsigned long kdfUkmLen;
 } sss_provider_ecdh_ctx_st;
 
 /* ********************** Private funtions ******************* */
@@ -85,6 +91,89 @@ cleanup:
     return ret;
 }
 
+static const OSSL_PARAM *sss_ecdh_keyexch_settable_ctx_params(void *ctx, void *provctx)
+{
+    static OSSL_PARAM params[] = {
+        OSSL_PARAM_int(OSSL_EXCHANGE_PARAM_EC_ECDH_COFACTOR_MODE, NULL),
+        OSSL_PARAM_utf8_string(OSSL_EXCHANGE_PARAM_KDF_TYPE, NULL, 0),
+        OSSL_PARAM_utf8_string(OSSL_EXCHANGE_PARAM_KDF_DIGEST, NULL, 0),
+        OSSL_PARAM_size_t(OSSL_EXCHANGE_PARAM_KDF_OUTLEN, NULL),
+        OSSL_PARAM_octet_string(OSSL_EXCHANGE_PARAM_KDF_UKM, NULL, 0),
+        OSSL_PARAM_END,
+    };
+    return params;
+}
+
+static int sss_ecdh_keyexch_set_ctx_params(void *ctx, const OSSL_PARAM params[])
+{
+    sss_provider_ecdh_ctx_st * pEcdhctx = ctx;
+    if (ctx == NULL) {
+        return 0;
+    }
+    for (const OSSL_PARAM* p = params; p->key; ++p) {
+        int ret;
+
+        if (strcmp(p->key, OSSL_EXCHANGE_PARAM_EC_ECDH_COFACTOR_MODE) == 0) {
+            int mod;
+
+            ret = OSSL_PARAM_get_int(p, &mod);
+            if (ret != 1) {
+                return ret;
+            }
+            if (mod != 0) {
+                sssProv_Print(LOG_DBG_ON, "enable EC_ECDH_COFACTOR_MODE is not supported.\n");
+                return 0;
+            }
+        } else if (strcmp(p->key, OSSL_EXCHANGE_PARAM_KDF_TYPE) == 0) {
+            const char *name = NULL;
+
+            ret = OSSL_PARAM_get_utf8_string_ptr(p, &name);
+            if (ret != 1) {
+                return ret;
+            }
+            if (name[0] == '\0') {
+                sssProv_Print(LOG_DBG_ON, "KDF_TYPE is NULL.\n");
+            } else if (strcmp(name, "X963KDF") == 0) {
+                pEcdhctx->useX963KDF = 1;
+            } else {
+                sssProv_Print(LOG_DBG_ON, "KDF_TYPE '%s' is not supported.\n", name);
+                return 0;
+            }
+        } else if (strcmp(p->key, OSSL_EXCHANGE_PARAM_KDF_DIGEST) == 0) {
+            const char *digest = NULL;
+
+            ret = OSSL_PARAM_get_utf8_string_ptr(p, &digest);
+            if (ret != 1) {
+                return ret;
+            }
+            pEcdhctx->kdfMd = EVP_MD_fetch(NULL, digest, "provider=default");
+        } else if (strcmp(p->key, OSSL_EXCHANGE_PARAM_KDF_OUTLEN) == 0) {
+            size_t outLen;
+
+            ret = OSSL_PARAM_get_size_t(p, &outLen);
+            if (ret != 1) {
+                return ret;
+            }
+            pEcdhctx->kdfOutLen = outLen;
+        } else if (strcmp(p->key, OSSL_EXCHANGE_PARAM_KDF_UKM) == 0) {
+            void *ukm = NULL;
+            size_t ukmLen;
+
+            ret = OSSL_PARAM_get_octet_string(p, &ukm, 0, &ukmLen);
+            if (ret != 1) {
+                return ret;
+            }
+            OPENSSL_free(pEcdhctx->kdfUkm);
+            pEcdhctx->kdfUkm = ukm;
+            pEcdhctx->kdfUkmLen = ukmLen;
+        } else {
+            sssProv_Print(LOG_DBG_ON, "parameter '%s' is not supported.\n", p->key);
+            return 0;
+        }
+    }
+    return 1;
+}
+
 static int sss_ecdh_keyexch_derive(void *ctx, unsigned char *secret, size_t *secretlen, size_t outlen)
 {
     int ret                            = 0;
@@ -107,11 +196,15 @@ static int sss_ecdh_keyexch_derive(void *ctx, unsigned char *secret, size_t *sec
         ENSURE_OR_GO_CLEANUP(pSession != NULL);
 
         if (secret == NULL) {
-            evp_secretLen = EVP_PKEY_size(pEcdhctx->pPeerEVPPkey);
-            if (evp_secretLen < 0) {
-                return 0;
+            if (pEcdhctx->useX963KDF) {
+                *secretlen = pEcdhctx->kdfOutLen;
+            } else {
+                evp_secretLen = EVP_PKEY_size(pEcdhctx->pPeerEVPPkey);
+                if (evp_secretLen < 0) {
+                    return 0;
+                }
+                *secretlen = (size_t)evp_secretLen;
             }
-            *secretlen = (size_t)evp_secretLen;
             return (*secretlen > 0);
         }
         else {
@@ -136,6 +229,28 @@ static int sss_ecdh_keyexch_derive(void *ctx, unsigned char *secret, size_t *sec
             sm_status = Se05x_API_ECDHGenerateSharedSecret(
                 &(pSession->s_ctx), pEcdhctx->pStoreObjCtx->keyid, pubBuf, pubBufLen, secret, secretlen);
             ENSURE_OR_GO_CLEANUP(sm_status == SM_OK);
+            if (pEcdhctx->useX963KDF) {
+                OSSL_PARAM params[4], *p = params;
+                const char* mdname = EVP_MD_get0_name(pEcdhctx->kdfMd);
+                EVP_KDF *kdf = EVP_KDF_fetch(NULL, "X963KDF", "provider=default");
+                EVP_KDF_CTX *kdfCtx = EVP_KDF_CTX_new(kdf);
+
+                *p++ = OSSL_PARAM_construct_utf8_string(OSSL_KDF_PARAM_DIGEST, (char*)mdname, 0);
+                *p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_KEY, secret, *secretlen);
+                if (pEcdhctx->kdfUkm != NULL && pEcdhctx->kdfUkmLen > 0) {
+                    *p++ = OSSL_PARAM_construct_octet_string(OSSL_KDF_PARAM_INFO, pEcdhctx->kdfUkm, pEcdhctx->kdfUkmLen);
+                }
+                *p = OSSL_PARAM_construct_end();
+                if (EVP_KDF_derive(kdfCtx, secret, pEcdhctx->kdfOutLen, params) <= 0) {
+                    sssProv_Print(LOG_DBG_ON, "failed to EVP_KDF_derive().\n");
+                    EVP_KDF_CTX_free(kdfCtx);
+                    EVP_KDF_free(kdf);
+                    return 0;
+                }
+                *secretlen = pEcdhctx->kdfOutLen;
+                EVP_KDF_CTX_free(kdfCtx);
+                EVP_KDF_free(kdf);
+            }
         }
     }
     else {
@@ -184,6 +299,8 @@ const OSSL_DISPATCH sss_ecdh_keyexch_functions[] = {{OSSL_FUNC_KEYEXCH_NEWCTX, (
     {OSSL_FUNC_KEYEXCH_SET_PEER, (void (*)(void))sss_ecdh_keyexch_set_peer},
     {OSSL_FUNC_KEYEXCH_DERIVE, (void (*)(void))sss_ecdh_keyexch_derive},
     {OSSL_FUNC_KEYEXCH_FREECTX, (void (*)(void))sss_ecdh_keyexch_freectx},
+    {OSSL_FUNC_KEYEXCH_SETTABLE_CTX_PARAMS, (void (*)(void))sss_ecdh_keyexch_settable_ctx_params},
+    {OSSL_FUNC_KEYEXCH_SET_CTX_PARAMS, (void (*)(void))sss_ecdh_keyexch_set_ctx_params},
     {0, NULL}};
 
 #endif //#if SSS_HAVE_ECC
